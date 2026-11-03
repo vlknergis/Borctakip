@@ -1,0 +1,15 @@
+BorçTakip PWA - Kurulum
+
+Bu paket, Android Chrome üzerinden ana ekrana kurulabilen çevrimdışı web uygulamasıdır.
+PWA olarak kurulum için dosyaların HTTPS destekleyen bir web adresinde yayınlanması gerekir.
+Yerel HTML dosyasını açmak uygulamayı çalıştırır ancak tarayıcıdan 'Uygulamayı yükle' seçeneği her cihazda çıkmayabilir.
+
+1) Paketi HTTPS destekleyen bir web barındırma alanına yükleyin.
+2) Android telefonda Chrome ile index.html adresini açın.
+3) Chrome menüsü > Uygulamayı yükle / Ana ekrana ekle.
+4) Uygulama telefonda bağımsız pencere ve simgeyle açılır.
+
+Notlar:
+- Veriler cihazın tarayıcı depolamasında tutulur. Ayarlar bölümünden düzenli yedek alın.
+- Ödeme hatırlatmaları, uygulama açıldığında kontrol edilir. Tarayıcı kapalıyken zamanında bildirim garantisi vermez.
+- Borç kapatma planı faizsiz yaklaşık simülasyondur.
