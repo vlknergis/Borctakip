@@ -76,7 +76,7 @@ canvas{width:100%!important;height:100%!important}
   <div class="card" id="recent"></div>
   
   <!-- Canlı Piyasa Verileri Bandı (En Altta) -->
-  <div class="section"><h2>Piyasa Durumu</h2><span class="small">Canlı Kurlar</span></div>
+  <div class="section"><h2>Piyasa Durumu <span class="small">(gecikmeli)</span></h2></div>
   <div class="ticker-bar" id="tickerBar">
     <div class="ticker-item"><span class="ticker-title">USD / TRY</span><span class="ticker-val" id="usdRate">Yükleniyor...</span></div>
     <div class="ticker-item"><span class="ticker-title">EUR / TRY</span><span class="ticker-val" id="eurRate">Yükleniyor...</span></div>
@@ -270,14 +270,14 @@ function savePhone(){
   save();
 }
 
-/* CANLI PİYASA KUR VERİLERİ (Güncellenmiş Gram Altın Çarpanı: ~6.455 TL seviyesi) */
+/* CANLI PİYASA KUR VERİLERİ (Güncellenmiş Çarpanlar) */
 async function fetchMarketRates(){
   try {
     let res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
     let d = await res.json();
     let usdTry = d.rates.TRY;
     let eurTry = usdTry / d.rates.EUR;
-    let goldGram = usdTry * 128; // Belirttiğin 6.400+ TL seviyesini yakalayan güncel çarpan
+    let goldGram = usdTry * 128;
 
     document.getElementById('usdRate').textContent = usdTry.toFixed(3) + ' ₺';
     document.getElementById('eurRate').textContent = eurTry.toFixed(3) + ' ₺';
@@ -595,7 +595,7 @@ function render(){
   let recent=[...data.payments].sort((a,b)=>b.date.localeCompare(b.date)).slice(0,4);
   document.getElementById('recent').innerHTML=recent.length?recent.map(p=>`<div class="history-item"><span>${esc(data.debts.find(d=>d.id===p.debtId)?.name||'Silinmiş borç')}<br><span class="small">${p.date} ${p.note?'· '+esc(p.note):''}</span></span><b class="green">−${money(p.amount)}</b></div>`).join(''):'<div class="empty">Henüz ödeme kaydı yok.</div>';
   
-  let all=[...data.payments].sort((a,b)=>b.date.localeCompare(b.date));
+  let all=[...data.payments].sort((a,b)=>b.date.localeCompare(a.date));
   document.getElementById('paymentCount').textContent=all.length+' işlem';
   document.getElementById('allPayments').innerHTML=all.length?all.map(p=>`<div class="history-item"><span>${esc(data.debts.find(d=>d.id===p.debtId)?.name||'Silinmiş borç')}<br><span class="small">${p.date}${p.note?' · '+esc(p.note):''}</span></span><b class="green">−${money(p.amount)}</b></div>`).join(''):'<div class="empty">Ödeme yaptığında burada görünecek.</div>'; 
   
