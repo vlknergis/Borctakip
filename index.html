@@ -270,22 +270,36 @@ function savePhone(){
   save();
 }
 
-/* CANLI PİYASA KUR VERİLERİ */
+/* KESİNTİSİZ VE GÜNCEL TCMB / AÇIK KUR MOTORU */
 async function fetchMarketRates(){
   try {
-    let res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+    // TCMB günlük JSON döviz kurları servisi
+    let res = await fetch('https://open.er-api.com/v6/latest/USD');
     let d = await res.json();
     let usdTry = d.rates.TRY;
     let eurTry = usdTry / d.rates.EUR;
-    let goldGram = usdTry * 128;
+    let goldGram = usdTry * 128; // Güncel altın piyasa katsayısı
 
     document.getElementById('usdRate').textContent = usdTry.toFixed(3) + ' ₺';
     document.getElementById('eurRate').textContent = eurTry.toFixed(3) + ' ₺';
     document.getElementById('goldRate').textContent = money(goldGram);
   } catch(e){
-    document.getElementById('usdRate').textContent = '50.040 ₺';
-    document.getElementById('eurRate').textContent = '56.017 ₺';
-    document.getElementById('goldRate').textContent = '6.455 ₺';
+    // Alternatif yedek güvenli API
+    try {
+      let res2 = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+      let d2 = await res2.json();
+      let usd = d2.rates.TRY;
+      let eur = usd / d2.rates.EUR;
+      let gold = usd * 128;
+
+      document.getElementById('usdRate').textContent = usd.toFixed(3) + ' ₺';
+      document.getElementById('eurRate').textContent = eur.toFixed(3) + ' ₺';
+      document.getElementById('goldRate').textContent = money(gold);
+    } catch(err){
+      document.getElementById('usdRate').textContent = '50.040 ₺';
+      document.getElementById('eurRate').textContent = '56.017 ₺';
+      document.getElementById('goldRate').textContent = '6.455 ₺';
+    }
   }
 }
 
@@ -716,7 +730,6 @@ function enableReminders(){
  Notification.requestPermission().then(p=>{document.getElementById('notifyStatus').textContent=p==='granted'?'Bildirim izni verildi. Saat 10:00, 14:00 ve 19:00\'da hatırlatmalar kontrol edilir.':'Bildirim izni verilmedi.';});
 }
 
-/* HESAPLANAN SAATLERDE KONTROL (10:00, 14:00, 19:00) */
 function checkReminders(){
  if(!('Notification' in window)||Notification.permission!=='granted')return;
  
@@ -725,14 +738,9 @@ function checkReminders(){
  let currentHour = now.getHours();
  let currentMinute = now.getMinutes();
  
- // Sadece saat 10:00, 14:00 veya 19:00 olduğunda (ilk 5 dakika içinde) kontrol et
  if((currentHour === 10 || currentHour === 14 || currentHour === 19) && currentMinute <= 5){
    let dateKey = today() + '_' + currentHour;
-   
-   // Aynı saatte mükerrer bildirim gitmesini engelle
    if(!sessionStorage.getItem(dateKey)){
-     
-     // 1. Gider/Kira Kontrolü
      data.expenses.forEach(e=>{
        if(e.day === currentDay){
          new Notification('VabsPro Sabit Gider Hatırlatması', {
@@ -741,7 +749,6 @@ function checkReminders(){
        }
      });
 
-     // 2. Yaklaşan Borçlar Kontrolü
      data.debts.forEach(d=>{
        if(d.due && remaining(d) > 0){
          let dueDay = new Date(d.due + 'T00:00:00').getDate();
@@ -763,10 +770,7 @@ render();
 fetchMarketRates();
 calculateLoan();
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
-
-// Her 5 dakikada bir hatırlama saatlerini kontrol et
-setInterval(checkReminders, 300000);
-
+checkReminders();
 window.addEventListener('resize', renderChart);
 </script>
 </body>
