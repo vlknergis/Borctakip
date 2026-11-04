@@ -270,22 +270,22 @@ function savePhone(){
   save();
 }
 
-/* CANLI PİYASA KUR VERİLERİ */
+/* CANLI PİYASA KUR VERİLERİ (Güncellenmiş Gram Altın Çarpanı: ~6.455 TL seviyesi) */
 async function fetchMarketRates(){
   try {
     let res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
     let d = await res.json();
     let usdTry = d.rates.TRY;
     let eurTry = usdTry / d.rates.EUR;
-    let goldGram = usdTry * 92.5;
+    let goldGram = usdTry * 128; // Belirttiğin 6.400+ TL seviyesini yakalayan güncel çarpan
 
-    document.getElementById('usdRate').textContent = usdTry.toFixed(2) + ' ₺';
-    document.getElementById('eurRate').textContent = eurTry.toFixed(2) + ' ₺';
+    document.getElementById('usdRate').textContent = usdTry.toFixed(3) + ' ₺';
+    document.getElementById('eurRate').textContent = eurTry.toFixed(3) + ' ₺';
     document.getElementById('goldRate').textContent = money(goldGram);
   } catch(e){
-    document.getElementById('usdRate').textContent = '36.85 ₺';
-    document.getElementById('eurRate').textContent = '38.40 ₺';
-    document.getElementById('goldRate').textContent = '3.150 ₺';
+    document.getElementById('usdRate').textContent = '50.040 ₺';
+    document.getElementById('eurRate').textContent = '56.017 ₺';
+    document.getElementById('goldRate').textContent = '6.455 ₺';
   }
 }
 
@@ -308,7 +308,7 @@ async function fetchNews(){
   } catch(e){
     el.innerHTML = `
       <div class="news-card"><b>Merkez Bankası Faiz Kararını Açıkladı</b><div class="small">Piyasalar faiz kararına odaklandı.</div></div>
-      <div class="news-card"><b>Altın Fiyatlarında Son Durum</b><div class="small">Gram altın yeni haftaya yükselişle başladı.</div></div>
+      <div class="news-card"><b>Altın Fiyatlarında Son Durum</b><div class="small">Gram altın 6.450 TL bandını test ediyor.</div></div>
       <div class="news-card"><b>Kredi Kartı Azami Akdi Faiz Oranları Güncellendi</b><div class="small">TCMB faiz oranlarında düzenlemeye gitti.</div></div>
     `;
   }
@@ -592,10 +592,10 @@ function render(){
     return `<div class="card"><div class="debt"><div class="icon">${d.type==='Kredi kartı'?'💳':d.type==='Ek hesap'?'🏦':'📄'}</div><div class="debt-main"><div class="debt-name">${esc(d.name)} ${d.rate?`<span class="badge badge-debt">%${d.rate} Faiz</span>`:''}</div><div class="debt-meta">${esc(d.type)}${d.due?' · Sonraki ödeme: '+new Date(d.due+'T12:00:00').toLocaleDateString('tr-TR'):''}</div></div><div class="amount">${money(rem)}</div></div><div class="progress"><div class="bar" style="width:${pct}%"></div></div><div class="row" style="margin-top:11px"><span class="small">%${pct.toFixed(0)} ödendi</span><div style="display:flex;gap:6px"><button class="ghost" onclick="editDebt('${d.id}')">Düzenle</button><button class="ghost" onclick="openPay('${d.id}')">＋ Öde</button><button class="danger" onclick="deleteDebt('${d.id}')">Sil</button></div></div></div>`
   }).join(''):'<div class="card empty">Henüz borç kaydın yok.<br>“Borç ekle” butonuyla ilk kaydını oluştur.</div>';
 
-  let recent=[...data.payments].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,4);
+  let recent=[...data.payments].sort((a,b)=>b.date.localeCompare(b.date)).slice(0,4);
   document.getElementById('recent').innerHTML=recent.length?recent.map(p=>`<div class="history-item"><span>${esc(data.debts.find(d=>d.id===p.debtId)?.name||'Silinmiş borç')}<br><span class="small">${p.date} ${p.note?'· '+esc(p.note):''}</span></span><b class="green">−${money(p.amount)}</b></div>`).join(''):'<div class="empty">Henüz ödeme kaydı yok.</div>';
   
-  let all=[...data.payments].sort((a,b)=>b.date.localeCompare(a.date));
+  let all=[...data.payments].sort((a,b)=>b.date.localeCompare(b.date));
   document.getElementById('paymentCount').textContent=all.length+' işlem';
   document.getElementById('allPayments').innerHTML=all.length?all.map(p=>`<div class="history-item"><span>${esc(data.debts.find(d=>d.id===p.debtId)?.name||'Silinmiş borç')}<br><span class="small">${p.date}${p.note?' · '+esc(p.note):''}</span></span><b class="green">−${money(p.amount)}</b></div>`).join(''):'<div class="empty">Ödeme yaptığında burada görünecek.</div>'; 
   
