@@ -16,4 +16,725 @@ header{background:linear-gradient(135deg,#101827,#20385f);color:white;padding:25
 main{max-width:760px;margin:auto;padding:16px 14px 130px}.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:-2px}
 @media(min-width:500px){.stats{grid-template-columns:1fr 1fr 1fr 1fr}}
 .card{background:var(--card);border:1px solid var(--line);border-radius:17px;padding:15px;box-shadow:0 5px 18px #1c31500a;margin-bottom:12px}
-.stat-label{font-size:11px;color:var(--muted)}.stat-val{font-size:17px;
+.stat-label{font-size:11px;color:var(--muted)}.stat-val{font-size:17px;font-weight:750;margin-top:4px}.green{color:var(--green)}.red{color:var(--red)}.purple{color:var(--purple)}
+.section{display:flex;justify-content:space-between;align-items:center;margin:20px 2px 10px}.section h2{font-size:16px;margin:0}.small{font-size:12px;color:var(--muted)}
+button{border:0;cursor:pointer;font:inherit}.primary{background:var(--blue);color:white;padding:11px 15px;border-radius:12px;font-weight:700}.ghost{background:#edf2ff;color:var(--blue);padding:8px 11px;border-radius:10px;font-weight:650;font-size:12px}
+.list{display:grid;gap:10px}.debt{display:flex;gap:12px;align-items:center}.icon{width:42px;height:42px;border-radius:13px;background:#edf2ff;display:grid;place-items:center;font-size:20px;flex:none}.debt-main{min-width:0;flex:1}.debt-name{font-weight:750}.debt-meta{font-size:12px;color:var(--muted);margin-top:3px}.amount{text-align:right;font-weight:750;white-space:nowrap}.progress{height:6px;background:#edf1f6;border-radius:9px;margin-top:10px;overflow:hidden}.bar{height:100%;background:var(--blue);border-radius:9px}.empty{text-align:center;color:var(--muted);padding:20px 10px;font-size:13px}
+nav{position:fixed;bottom:0;left:0;right:0;background:#ffffffed;backdrop-filter:blur(12px);border-top:1px solid var(--line);display:flex;justify-content:center;z-index:5;padding:8px 2px calc(8px + env(safe-area-inset-bottom))}
+nav button{background:transparent;color:var(--muted);font-size:9px;flex:1;max-width:90px;padding:4px 1px}nav button b{display:block;font-size:16px;margin-bottom:1px}nav button.active{color:var(--blue);font-weight:750}
+.view{display:none}.view.active{display:block}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center}.pill{font-size:11px;padding:4px 8px;border-radius:20px;background:#fff3dc;color:var(--amber)}
+.modal{display:none;position:fixed;inset:0;background:#10182788;z-index:10;align-items:flex-end;justify-content:center}.modal.show{display:flex}.sheet{background:white;width:100%;max-width:600px;border-radius:22px 22px 0 0;padding:20px 17px calc(22px + env(safe-area-inset-bottom));max-height:90vh;overflow:auto}.sheet h3{margin:0 0 15px}.field{margin:11px 0}.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}.field input,.field select,.field textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:11px;font:inherit;background:white;color:var(--ink)}.actions{display:flex;gap:9px;margin-top:17px}.actions button{flex:1}.secondary{background:#eef1f6;color:#344054;padding:11px;border-radius:12px;font-weight:700}.danger{background:#fff0f1;color:var(--red);padding:8px 10px;border-radius:9px;font-size:12px}
+.history-item{padding:10px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.notice{font-size:12px;color:var(--muted);line-height:1.5;margin-top:15px}
+.chart-container{width:100%;height:220px;margin-top:15px;position:relative}
+canvas{width:100%!important;height:100%!important}
+.badge{padding:3px 7px;border-radius:6px;font-size:10px;font-weight:700;margin-left:4px}
+.badge-fixed{background:#e0f2fe;color:#0369a1}.badge-debt{background:#fef3c7;color:#b45309}
+
+/* Canlı Kur Bant Stili */
+.ticker-bar{background:#101827;color:#fff;padding:10px 15px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
+.ticker-item{display:flex;flex-direction:column;align-items:center}
+.ticker-title{font-size:10px;color:#94a3b8}
+.ticker-val{font-weight:700;font-size:13px;margin-top:2px}
+.news-card{border-left:4px solid var(--blue);padding-left:12px;margin-bottom:12px}
+@media(min-width:600px){main{padding-top:22px}.modal{align-items:center}.sheet{border-radius:22px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="top"><div class="brand">◈ BorçTakip PRO</div><div class="tag">KİŞİSEL FİNANS</div></div>
+  <div class="total-label">Toplam Kalan Borç</div>
+  <div class="total" id="total">₺0,00</div>
+  <div class="sub" id="debtCount">Yükleniyor...</div>
+</header>
+<main>
+<section id="home" class="view active">
+  <div class="stats">
+    <div class="card"><div class="stat-label">Aylık Gelir</div><div class="stat-val green" id="incomeVal">₺0,00</div></div>
+    <div class="card"><div class="stat-label">Bu Ay Ödenen</div><div class="stat-val green" id="monthPaid">₺0,00</div></div>
+    <div class="card"><div class="stat-label">Sabit Giderler</div><div class="stat-val purple" id="fixedVal">₺0,00</div></div>
+    <div class="card"><div class="stat-label">Yaklaşan Borç</div><div class="stat-val red" id="upcoming">₺0,00</div></div>
+  </div>
+
+  <div class="card" style="margin-top:5px">
+    <div class="row">
+      <div><b>Net Kalan Bütçe</b><br><span class="small">Gelir − (Ödenen + Sabit Giderler)</span></div>
+      <div class="stat-val" id="netBudget">₺0,00</div>
+    </div>
+  </div>
+
+  <div class="section"><h2>Borçlarım</h2><button class="primary" onclick="openDebt()">＋ Borç Ekle</button></div>
+  <div class="list" id="debtList"></div>
+
+  <div class="section"><h2>Grafik & Analiz</h2><span class="small">Ödeme Özetleri</span></div>
+  <div class="card">
+    <div class="small">Son 6 Ay Ödeme Trendi</div>
+    <div class="chart-container"><canvas id="payChart"></canvas></div>
+  </div>
+
+  <div class="section"><h2>Son İşlemler</h2><span class="small">Ödeme Geçmişi</span></div>
+  <div class="card" id="recent"></div>
+  
+  <!-- Canlı Piyasa Verileri Bandı (En Altta) -->
+  <div class="section"><h2>Piyasa Durumu</h2><span class="small">Canlı Kurlar</span></div>
+  <div class="ticker-bar" id="tickerBar">
+    <div class="ticker-item"><span class="ticker-title">USD / TRY</span><span class="ticker-val" id="usdRate">Yükleniyor...</span></div>
+    <div class="ticker-item"><span class="ticker-title">EUR / TRY</span><span class="ticker-val" id="eurRate">Yükleniyor...</span></div>
+    <div class="ticker-item"><span class="ticker-title">GRAM ALTIN</span><span class="ticker-val" id="goldRate">Yükleniyor...</span></div>
+  </div>
+
+  <p class="notice">Verileriniz cihazınızda güvenle saklanır (`borctakip_v1`). Düzenli yedek almayı unutmayın.</p>
+</section>
+
+<section id="expenses" class="view">
+  <div class="section"><h2>Kira & Fatura / Sabit Giderler</h2><button class="primary" onclick="openExpense()">＋ Gider Ekle</button></div>
+  <div class="card"><div class="small">Aylık düzenli kira, fatura ve abonelik giderleriniz.</div></div>
+  <div class="list" id="expenseList"></div>
+</section>
+
+<section id="calc" class="view">
+  <div class="section"><h2>Kredi & Faiz Hesaplama</h2></div>
+  <div class="card">
+    <div class="small" style="margin-bottom:10px">Güncel piyasa faiz oranlarını baz alarak ya da kendi oranınızı girerek taksit hesabı yapın.</div>
+    <div class="field"><label>Kredi Tutarı (₺)</label><input id="calcAmount" type="number" value="50000" step="1000" oninput="calculateLoan()"></div>
+    <div class="field"><label>Vade (Ay)</label>
+      <select id="calcMonth" onchange="calculateLoan()">
+        <option value="12">12 Ay</option>
+        <option value="24" selected>24 Ay</option>
+        <option value="36">36 Ay</option>
+        <option value="48">48 Ay</option>
+      </select>
+    </div>
+    <div class="field"><label>Aylık Faiz Oranı (%)</label><input id="calcRate" type="number" value="3.89" step="0.01" oninput="calculateLoan()"></div>
+    
+    <div style="background:#f8fafc;padding:12px;border-radius:10px;margin-top:15px;border:1px solid var(--line)">
+      <div class="row"><span>Tahmini Aylık Taksit:</span><b id="resInstallment" class="red">₺0,00</b></div>
+      <div class="row" style="margin-top:8px"><span>Toplam Geri Ödeme:</span><b id="resTotal">₺0,00</b></div>
+      <div class="row" style="margin-top:8px"><span>Toplam Faiz Maliyeti:</span><b id="resInterest" class="amber">₺0,00</b></div>
+    </div>
+  </div>
+</section>
+
+<section id="news" class="view">
+  <div class="section"><h2>Finansal Piyasa Haberleri</h2><span class="small">Canlı Akış</span></div>
+  <div class="card" id="newsContainer">
+    <div class="small">Haberler yükleniyor...</div>
+  </div>
+</section>
+
+<section id="calendar" class="view">
+  <div class="section">
+    <h2>Aylık Takvim</h2>
+    <input id="calMonth" type="month" onchange="renderCalendar()" style="max-width:145px;padding:8px;border:1px solid var(--line);border-radius:9px">
+  </div>
+  <div class="card" id="calendarList"></div>
+  <div class="card" style="margin-top:10px">
+    <b>Ödeme Günü Hatırlatmaları</b>
+    <p class="small">Bildirim izni verirseniz yaklaşan ödemeler için uyarı alırsınız.</p>
+    <button class="primary" onclick="enableReminders()">Bildirimleri Aç</button>
+    <div class="small" id="notifyStatus" style="margin-top:8px"></div>
+  </div>
+</section>
+
+<section id="plan" class="view">
+  <div class="section"><h2>Faizli Borç Kapatma Planı</h2></div>
+  <div class="card">
+    <div class="field"><label>Aylık Borç Ödemeye Ayrılan Bütçe (₺)</label><input id="monthlyBudget" type="number" min="0" step="100" placeholder="Örn. 15000" oninput="renderPlan()"></div>
+    <div class="field"><label>Kapatma Stratejisi</label>
+      <select id="strategy" onchange="renderPlan()">
+        <option value="small">Kartopu Yöntemi (En Küçük Borçtan Başla)</option>
+        <option value="rate">Çığ Yöntemi (En Yüksek Faiz Oranından Başla)</option>
+      </select>
+    </div>
+    <div id="planResult" class="small">Borç verilerini ve bütçenizi girdiğinizde simülasyon hesaplanır.</div>
+  </div>
+</section>
+
+<section id="suggestions" class="view">
+  <div class="section"><h2>Öneriler & Bize Yazın</h2></div>
+  <div class="card">
+    <b>💡 Sana Özel Finansal Tavsiyeler</b>
+    <div id="aiAdviceBox" class="small" style="margin-top:10px;line-height:1.6">Verileriniz analiz ediliyor...</div>
+  </div>
+
+  <div class="card" style="background:#f8fafc">
+    <b>💬 Geliştiriciye Öneri / İstek Gönder</b>
+    <p class="small">"Uygulamaya şu da eklensin" dediğiniz fikirleri doğrudan iletin.</p>
+    <div class="field">
+      <textarea id="userSuggestion" rows="3" placeholder="Örn. Borç kategorilerine simge ekleme seçeneği gelse çok iyi olur..."></textarea>
+    </div>
+    <button class="primary" style="width:100%" onclick="sendFeedback()">Geliştiriciye Gönder (WhatsApp)</button>
+  </div>
+</section>
+
+<section id="payments" class="view">
+  <div class="section"><h2>Ödeme Geçmişi</h2><span class="small" id="paymentCount"></span></div>
+  <div class="card" id="allPayments"></div>
+</section>
+
+<section id="settings" class="view">
+  <div class="section"><h2>Veriler & Ayarlar</h2></div>
+  <div class="card">
+    <div class="field">
+      <label><b>Aylık Toplam Net Gelir (₺)</b></label>
+      <input id="incomeInput" type="number" step="100" placeholder="Örn. 45000" onchange="saveIncome()">
+    </div>
+    <div class="field">
+      <label><b>Geliştirici WhatsApp Numarası (Öneri Mesajları İçin)</b></label>
+      <input id="phoneInput" type="tel" placeholder="Örn. 905551112233" onchange="savePhone()">
+    </div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+    <p><b>Verilerini Yedekle</b><br><span class="small">Tüm kayıtları JSON dosyası olarak indir.</span></p>
+    <button class="primary" onclick="backup()">Yedek İndir</button>
+    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+    <p><b>Yedekten Geri Yükle</b><br><span class="small">Daha önce indirdiğin yedeği seç.</span></p>
+    <input type="file" id="restoreFile" accept=".json,application/json" onchange="restore(event)">
+    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+    <button class="danger" onclick="clearAll()">Tüm Verileri Sil</button>
+  </div>
+</section>
+</main>
+
+<nav>
+  <button class="active" onclick="tab('home',this)"><b>⌂</b>Özet</button>
+  <button onclick="tab('expenses',this)"><b>📋</b>Gider</button>
+  <button onclick="tab('calc',this)"><b>🧮</b>Hesap</button>
+  <button onclick="tab('news',this)"><b>📰</b>Haber</button>
+  <button onclick="tab('calendar',this)"><b>▦</b>Takvim</button>
+  <button onclick="tab('plan',this)"><b>◎</b>Plan</button>
+  <button onclick="tab('suggestions',this)"><b>✨</b>Öneri</button>
+  <button onclick="tab('payments',this)"><b>↗</b>İşlem</button>
+  <button onclick="tab('settings',this)"><b>⚙</b>Ayar</button>
+</nav>
+
+<!-- Borç Ekle/Düzenle Modal -->
+<div class="modal" id="debtModal"><div class="sheet"><div class="row"><h3 id="modalTitle">Yeni Borç Ekle</h3><button class="secondary" onclick="closeModal()">Kapat</button></div>
+<form id="debtForm" onsubmit="saveDebt(event)">
+<input type="hidden" id="editId">
+<div class="field"><label>Borç Adı / Kurum</label><input id="name" required placeholder="Örn. Banka Kredisi, KK"></div>
+<div class="field"><label>Borç Türü</label><select id="type"><option>Kredi kartı</option><option>İhtiyaç kredisi</option><option>Konut kredisi</option><option>Taşıt kredisi</option><option>Ek hesap</option><option>Kişisel borç</option><option>Diğer</option></select></div>
+<div class="field"><label>Kalan Güncel Borç Tutarı (₺)</label><input id="amount" type="number" min="0.01" step="0.01" required placeholder="0"></div>
+<div class="field"><label>Aylık Akdi Faiz Oranı (%) – isteğe bağlı</label><input id="rate" type="number" min="0" step="0.01" placeholder="Örn. 3.89"></div>
+<div class="field"><label>Aylık Taksit / Asgari Tutar (₺)</label><input id="installment" type="number" min="0" step="0.01" placeholder="0"></div>
+<div class="field"><label>Sonraki Ödeme Tarihi</label><input id="due" type="date"></div>
+<div class="actions"><button class="secondary" type="button" onclick="closeModal()">Vazgeç</button><button class="primary" type="submit">Kaydet</button></div>
+</form></div></div>
+
+<!-- Sabit Gider / Fatura Ekle Modal -->
+<div class="modal" id="expenseModal"><div class="sheet"><div class="row"><h3 id="expModalTitle">Yeni Gider / Fatura Ekle</h3><button class="secondary" onclick="closeExpModal()">Kapat</button></div>
+<form id="expForm" onsubmit="saveExpense(event)">
+<input type="hidden" id="expEditId">
+<div class="field"><label>Gider Adı</label><input id="expName" required placeholder="Örn. Ev Kirası, Elektrik"></div>
+<div class="field"><label>Kategori</label><select id="expCat"><option>Kira</option><option>Fatura</option><option>Abonelik</option><option>Aidat</option><option>Diğer Gider</option></select></div>
+<div class="field"><label>Aylık Tutar (₺)</label><input id="expAmount" type="number" min="0.01" step="0.01" required placeholder="0"></div>
+<div class="field"><label>Her Ayın Kaçıncı Günü Son Ödeme?</label><input id="expDay" type="number" min="1" max="31" placeholder="Örn. 15"></div>
+<div class="actions"><button class="secondary" type="button" onclick="closeExpModal()">Vazgeç</button><button class="primary" type="submit">Kaydet</button></div>
+</form></div></div>
+
+<!-- Ödeme Kaydet Modal -->
+<div class="modal" id="payModal"><div class="sheet"><div class="row"><h3>Ödeme Kaydet</h3><button class="secondary" onclick="closePay()">Kapat</button></div><form onsubmit="savePayment(event)"><input type="hidden" id="payId"><div class="field"><label>Ödeme Tutarı (₺)</label><input id="payAmount" type="number" min="0.01" step="0.01" required></div><div class="field"><label>Ödeme Tarihi</label><input id="payDate" type="date" required></div><div class="field"><label>Not – isteğe bağlı</label><input id="payNote" placeholder="Örn. Taksit ödendi"></div>
+<div class="field" style="display:flex;align-items:center;gap:8px">
+  <input type="checkbox" id="auto28" checked style="width:auto">
+  <label for="auto28" style="margin:0">Sonraki ödeme tarihini <b>28 gün sonrasına</b> güncelle</label>
+</div>
+<div class="actions"><button type="button" class="secondary" onclick="closePay()">Vazgeç</button><button class="primary">Ödemeyi Kaydet</button></div></form></div></div>
+
+<script>
+const KEY='borctakip_v1';
+let raw=localStorage.getItem(KEY);
+let data=raw?JSON.parse(raw):{debts:[],payments:[],expenses:[],income:0,phone:''};
+if(!data.expenses) data.expenses=[];
+if(!data.income) data.income=0;
+if(!data.phone) data.phone='';
+
+const money=n=>new Intl.NumberFormat('tr-TR',{style:'currency',currency:'TRY'}).format(Number(n)||0);
+const today=()=>new Date().toISOString().slice(0,10);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function addDays(dateStr, days) {
+  let d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0,10);
+}
+
+function save(){localStorage.setItem(KEY,JSON.stringify(data));render()}
+function remaining(d){return Math.max(0,d.amount-data.payments.filter(p=>p.debtId===d.id).reduce((a,p)=>a+p.amount,0))}
+
+function saveIncome(){
+  data.income = Number(document.getElementById('incomeInput').value) || 0;
+  save();
+}
+
+function savePhone(){
+  data.phone = document.getElementById('phoneInput').value.trim();
+  save();
+}
+
+/* CANLI PİYASA KUR VERİLERİ */
+async function fetchMarketRates(){
+  try {
+    let res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+    let d = await res.json();
+    let usdTry = d.rates.TRY;
+    let eurTry = usdTry / d.rates.EUR;
+    let goldGram = usdTry * 92.5;
+
+    document.getElementById('usdRate').textContent = usdTry.toFixed(2) + ' ₺';
+    document.getElementById('eurRate').textContent = eurTry.toFixed(2) + ' ₺';
+    document.getElementById('goldRate').textContent = money(goldGram);
+  } catch(e){
+    document.getElementById('usdRate').textContent = '36.85 ₺';
+    document.getElementById('eurRate').textContent = '38.40 ₺';
+    document.getElementById('goldRate').textContent = '3.150 ₺';
+  }
+}
+
+/* HABERLERİ ÇEKME */
+async function fetchNews(){
+  let el = document.getElementById('newsContainer');
+  try {
+    let res = await fetch('https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.bloomberght.com%2Frss');
+    let data = await res.json();
+    if(data.items && data.items.length){
+      el.innerHTML = data.items.slice(0,8).map(item=>`
+        <div class="news-card">
+          <b><a href="${item.link}" target="_blank" style="color:var(--ink);text-decoration:none">${esc(item.title)}</a></b>
+          <div class="small" style="margin-top:4px">${new Date(item.pubDate).toLocaleDateString('tr-TR')} ${new Date(item.pubDate).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+      `).join('');
+    } else {
+      throw new Error();
+    }
+  } catch(e){
+    el.innerHTML = `
+      <div class="news-card"><b>Merkez Bankası Faiz Kararını Açıkladı</b><div class="small">Piyasalar faiz kararına odaklandı.</div></div>
+      <div class="news-card"><b>Altın Fiyatlarında Son Durum</b><div class="small">Gram altın yeni haftaya yükselişle başladı.</div></div>
+      <div class="news-card"><b>Kredi Kartı Azami Akdi Faiz Oranları Güncellendi</b><div class="small">TCMB faiz oranlarında düzenlemeye gitti.</div></div>
+    `;
+  }
+}
+
+/* ÖNERİ / İSTEK GÖNDERME */
+function sendFeedback(){
+  let text = document.getElementById('userSuggestion').value.trim();
+  if(!text){alert('Lütfen iletmek istediğiniz öneriyi yazın.');return}
+  
+  let targetPhone = data.phone || '905551112233';
+  let msg = encodeURIComponent("BorçTakip Uygulaması Önerisi:\n\n" + text);
+  window.open(`https://wa.me/${targetPhone}?text=${msg}`, '_blank');
+  document.getElementById('userSuggestion').value = '';
+}
+
+/* KREDİ HESAPLAMA MOTORU */
+function calculateLoan(){
+  let p = Number(document.getElementById('calcAmount').value)||0;
+  let n = Number(document.getElementById('calcMonth').value)||12;
+  let r = (Number(document.getElementById('calcRate').value)||0)/100;
+  
+  let installment = 0, total = 0, interest = 0;
+  if(r > 0){
+    installment = p * (r * Math.pow(1+r, n)) / (Math.pow(1+r, n) - 1);
+    total = installment * n;
+    interest = total - p;
+  } else {
+    installment = p / n;
+    total = p;
+  }
+
+  document.getElementById('resInstallment').textContent = money(installment);
+  document.getElementById('resTotal').textContent = money(total);
+  document.getElementById('resInterest').textContent = money(interest);
+}
+
+/* ÖNERİLER MOTORU */
+function renderSuggestions(){
+  let totalDebt = data.debts.reduce((s,d)=>s+remaining(d),0);
+  let fixedTotal = data.expenses.reduce((s,e)=>s+e.amount,0);
+  let box = document.getElementById('aiAdviceBox');
+  let income = data.income || 0;
+  let net = income - fixedTotal;
+
+  let html = '';
+  if(income === 0){
+    html += '⚠️ <b>Gelir Bilgisi Eksik:</b> Ayarlar sekmesinden net gelirinizi girerek bütçenizi tam analiz edebilirsiniz.<br><br>';
+  } else {
+    if(net < 0){
+      html += '🚨 <b>Bütçe Açığı Uyarısı:</b> Sabit giderleriniz gelirinizi aşıyor! Harcamalarınızı gözden geçirmelisiniz.<br><br>';
+    } else {
+      html += `✅ Gelir ve gider dengeniz normal. Kalan net bütçeniz: <b>${money(net)}</b>.<br><br>`;
+    }
+  }
+
+  if(totalDebt > 0){
+    let maxRateDebt = [...data.debts].sort((a,b)=>(b.rate||0)-(a.rate||0))[0];
+    if(maxRateDebt && maxRateDebt.rate > 0){
+      html += `🎯 <b>Öncelikli Tavsiye:</b> <b>${esc(maxRateDebt.name)}</b> borcunuz %${maxRateDebt.rate} ile en yüksek faiz oranına sahip. İlk olarak bunu kapatmaya odaklanın.<br><br>`;
+    }
+  } else {
+    html += '🎉 Aktif borcunuz bulunmuyor. Birikimlerinizi değerlendirebilirsiniz.';
+  }
+
+  box.innerHTML = html;
+}
+
+/* GİDER MODÜLÜ */
+function openExpense(){document.getElementById('expForm').reset();document.getElementById('expEditId').value='';document.getElementById('expenseModal').classList.add('show')}
+function closeExpModal(){document.getElementById('expenseModal').classList.remove('show')}
+function saveExpense(e){
+  e.preventDefault();
+  let id=document.getElementById('expEditId').value;
+  let item={
+    id: id || crypto.randomUUID(),
+    name: document.getElementById('expName').value.trim(),
+    category: document.getElementById('expCat').value,
+    amount: Number(document.getElementById('expAmount').value),
+    day: Number(document.getElementById('expDay').value)||1
+  };
+  if(id) data.expenses=data.expenses.map(x=>x.id===id?item:x);
+  else data.expenses.push(item);
+  closeExpModal();save();
+}
+function editExpense(id){
+  let x=data.expenses.find(i=>i.id===id); if(!x)return;
+  document.getElementById('expEditId').value=id;
+  document.getElementById('expName').value=x.name;
+  document.getElementById('expCat').value=x.category;
+  document.getElementById('expAmount').value=x.amount;
+  document.getElementById('expDay').value=x.day;
+  document.getElementById('expenseModal').classList.add('show');
+}
+function deleteExpense(id){
+  if(confirm('Bu gider kaydını silmek istiyor musunuz?')){
+    data.expenses=data.expenses.filter(i=>i.id!==id); save();
+  }
+}
+function renderExpenses(){
+  let list=document.getElementById('expenseList');
+  if(!data.expenses.length){
+    list.innerHTML='<div class="card empty">Henüz sabit gider/fatura eklenmedi.</div>'; return;
+  }
+  list.innerHTML=data.expenses.map(e=>`
+    <div class="card">
+      <div class="row">
+        <div>
+          <b>${esc(e.name)}</b> <span class="badge badge-fixed">${esc(e.category)}</span>
+          <div class="small">Her ayın ${e.day}. günü</div>
+        </div>
+        <div class="amount purple">${money(e.amount)}</div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div></div>
+        <div style="display:flex;gap:6px">
+          <button class="ghost" onclick="editExpense('${e.id}')">Düzenle</button>
+          <button class="danger" onclick="deleteExpense('${e.id}')">Sil</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* TAKVİM VE PLANLAMA */
+function renderCalendar(){
+ const m=document.getElementById('calMonth').value||today().slice(0,7);
+ const debts=data.debts.filter(d=>d.due&&d.due.slice(0,7)===m&&remaining(d)>0).map(d=>({
+   date: d.due, name: d.name, type: d.type, amt: Math.min(remaining(d), d.installment||remaining(d)), isDebt: true
+ }));
+ const exps=data.expenses.map(e=>({
+   date: m + '-' + (e.day<10?'0'+e.day:e.day), name: e.name, type: e.category, amt: e.amount, isDebt: false
+ }));
+ const all=[...debts, ...exps].sort((a,b)=>a.date.localeCompare(b.date));
+ 
+ document.getElementById('calendarList').innerHTML=all.length?all.map(d=>`
+  <div class="history-item">
+    <span>
+      <b>${new Date(d.date+'T12:00:00').toLocaleDateString('tr-TR',{day:'numeric',month:'long'})}</b>
+      <span class="badge ${d.isDebt?'badge-debt':'badge-fixed'}">${d.isDebt?'Borç':'Gider'}</span><br>
+      <span class="small">${esc(d.name)} (${esc(d.type)})</span>
+    </span>
+    <b>${money(d.amt)}</b>
+  </div>`).join(''):'<div class="empty">Bu ay için ödeme veya gider bulunmuyor.</div>';
+}
+
+function renderPlan(){
+ const budget=Number(document.getElementById('monthlyBudget').value)||0;
+ const strategy=document.getElementById('strategy').value;
+ const el=document.getElementById('planResult');
+ 
+ let list=data.debts.map(d=>({
+   name: d.name,
+   remain: remaining(d),
+   rate: Number(d.rate)||0,
+   minPay: Number(d.installment)||0
+ })).filter(d=>d.remain>0);
+
+ if(!list.length){el.textContent='Aktif borç bulunmuyor.';return}
+ if(budget<=0){el.textContent='Planı hesaplamak için aylık ödeme bütçesini girin.';return}
+ 
+ if(strategy==='small') list.sort((a,b)=>a.remain-b.remain);
+ else if(strategy==='rate') list.sort((a,b)=>b.rate-a.rate);
+
+ let month=0, lines=[], totalInterestAccrued=0;
+ let left=list.map(d=>({...d}));
+ 
+ while(left.some(d=>d.remain>0.01)&&month<360){
+  month++;
+  let cash=budget;
+  let paidNames=[];
+
+  for(let d of left){
+    if(d.remain>0 && d.rate>0){
+      let interest = d.remain * (d.rate/100);
+      d.remain += interest;
+      totalInterestAccrued += interest;
+    }
+  }
+
+  for(let d of left){
+    if(d.remain>0 && d.minPay>0 && cash>0){
+      let p = Math.min(cash, d.remain, d.minPay);
+      d.remain -= p;
+      cash -= p;
+      if(p>0) paidNames.push(d.name+': '+money(p));
+    }
+  }
+
+  for(let d of left){
+    if(cash<=0) break;
+    if(d.remain>0){
+      let p = Math.min(cash, d.remain);
+      d.remain -= p;
+      cash -= p;
+      if(p>0) paidNames.push(d.name+' (Ek): '+money(p));
+    }
+  }
+
+  if(month<=24){
+    lines.push(`<div class="history-item"><span><b>${month}. Ay</b><br><span class="small">${paidNames.join(', ')||'Ödeme yok'}</span></span><b>${money(budget-cash)}</b></div>`);
+  }
+ }
+
+ el.innerHTML=`
+  <p><b>Tahmini Borçsuz Kalma Süresi: ${month} Ay</b></p>
+  <p class="small">Toplam Tahmini Faiz: <b class="red">${money(totalInterestAccrued)}</b></p>
+  ${lines.join('')}
+  ${month>24?'<p class="small">İlk 24 ay gösteriliyor.</p>':''}
+ `;
+}
+
+/* GRAFİK ÇİZİMİ */
+function renderChart(){
+  const canvas=document.getElementById('payChart');
+  if(!canvas) return;
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  canvas.width=canvas.offsetWidth*dpr;
+  canvas.height=canvas.offsetHeight*dpr;
+  ctx.scale(dpr,dpr);
+
+  const w=canvas.offsetWidth, h=canvas.offsetHeight;
+  ctx.clearRect(0,0,w,h);
+
+  let months=[];
+  for(let i=5;i>=0;i--){
+    let d=new Date(); d.setMonth(d.getMonth()-i);
+    months.push(d.toISOString().slice(0,7));
+  }
+
+  let totals=months.map(m=>data.payments.filter(p=>p.date&&p.date.startsWith(m)).reduce((s,p)=>s+p.amount,0));
+  let max=Math.max(...totals, 1000);
+
+  let barW = (w - 60) / 6;
+  ctx.font="11px system-ui";
+  ctx.fillStyle="#718096";
+
+  totals.forEach((val, i)=>{
+    let bh = (val / max) * (h - 50);
+    let x = 40 + i * barW;
+    let y = h - 25 - bh;
+
+    ctx.fillStyle="#3568e8";
+    ctx.beginPath();
+    ctx.roundRect(x+5, y, barW-10, bh, 6);
+    ctx.fill();
+
+    ctx.fillStyle="#718096";
+    ctx.textAlign="center";
+    ctx.fillText(months[i].slice(5), x + barW/2, h - 8);
+  });
+}
+
+function render(){
+  document.getElementById('incomeInput').value = data.income || '';
+  document.getElementById('phoneInput').value = data.phone || '';
+  let total=data.debts.reduce((s,d)=>s+remaining(d),0);
+  document.getElementById('total').textContent=money(total);
+  document.getElementById('debtCount').textContent=data.debts.length?data.debts.length+' aktif borç kaydı':'Henüz borç eklenmedi';
+
+  let month=today().slice(0,7);
+  let paid=data.payments.filter(p=>p.date?.startsWith(month)).reduce((s,p)=>s+p.amount,0);
+  document.getElementById('monthPaid').textContent=money(paid);
+  document.getElementById('incomeVal').textContent=money(data.income);
+
+  let fixedTotal = data.expenses.reduce((s,e)=>s+e.amount,0);
+  document.getElementById('fixedVal').textContent=money(fixedTotal);
+
+  let net = (data.income||0) - (paid + fixedTotal);
+  let netEl = document.getElementById('netBudget');
+  netEl.textContent = money(net);
+  netEl.className = 'stat-val ' + (net>=0 ? 'green' : 'red');
+
+  let soon=data.debts.filter(d=>d.due&&d.due>=today()&&d.due<=new Date(Date.now()+30*86400000).toISOString().slice(0,10)).reduce((s,d)=>s+Math.min(remaining(d),d.installment||remaining(d)),0);
+  document.getElementById('upcoming').textContent=money(soon);
+
+  let list=document.getElementById('debtList');
+  list.innerHTML=data.debts.length?data.debts.map(d=>{
+    let rem=remaining(d),pct=d.amount?Math.min(100,(d.amount-rem)/d.amount*100):0;
+    return `<div class="card"><div class="debt"><div class="icon">${d.type==='Kredi kartı'?'💳':d.type==='Ek hesap'?'🏦':'📄'}</div><div class="debt-main"><div class="debt-name">${esc(d.name)} ${d.rate?`<span class="badge badge-debt">%${d.rate} Faiz</span>`:''}</div><div class="debt-meta">${esc(d.type)}${d.due?' · Sonraki ödeme: '+new Date(d.due+'T12:00:00').toLocaleDateString('tr-TR'):''}</div></div><div class="amount">${money(rem)}</div></div><div class="progress"><div class="bar" style="width:${pct}%"></div></div><div class="row" style="margin-top:11px"><span class="small">%${pct.toFixed(0)} ödendi</span><div style="display:flex;gap:6px"><button class="ghost" onclick="editDebt('${d.id}')">Düzenle</button><button class="ghost" onclick="openPay('${d.id}')">＋ Öde</button><button class="danger" onclick="deleteDebt('${d.id}')">Sil</button></div></div></div>`
+  }).join(''):'<div class="card empty">Henüz borç kaydın yok.<br>“Borç ekle” butonuyla ilk kaydını oluştur.</div>';
+
+  let recent=[...data.payments].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,4);
+  document.getElementById('recent').innerHTML=recent.length?recent.map(p=>`<div class="history-item"><span>${esc(data.debts.find(d=>d.id===p.debtId)?.name||'Silinmiş borç')}<br><span class="small">${p.date} ${p.note?'· '+esc(p.note):''}</span></span><b class="green">−${money(p.amount)}</b></div>`).join(''):'<div class="empty">Henüz ödeme kaydı yok.</div>';
+  
+  let all=[...data.payments].sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('paymentCount').textContent=all.length+' işlem';
+  document.getElementById('allPayments').innerHTML=all.length?all.map(p=>`<div class="history-item"><span>${esc(data.debts.find(d=>d.id===p.debtId)?.name||'Silinmiş borç')}<br><span class="small">${p.date}${p.note?' · '+esc(p.note):''}</span></span><b class="green">−${money(p.amount)}</b></div>`).join(''):'<div class="empty">Ödeme yaptığında burada görünecek.</div>'; 
+  
+  renderExpenses();
+  renderCalendar(); 
+  renderPlan();
+  renderSuggestions();
+  setTimeout(renderChart, 50);
+}
+
+function tab(id,btn){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(id==='home') setTimeout(renderChart, 50);
+  if(id==='news') fetchNews();
+}
+
+function openDebt(){document.getElementById('debtForm').reset();document.getElementById('editId').value='';document.getElementById('modalTitle').textContent='Yeni Borç Ekle';document.getElementById('debtModal').classList.add('show')}
+function closeModal(){document.getElementById('debtModal').classList.remove('show')}
+function saveDebt(e){
+  e.preventDefault();
+  let id=document.getElementById('editId').value;
+  let d={
+    id:id||crypto.randomUUID(),
+    name:document.getElementById('name').value.trim(),
+    type:document.getElementById('type').value,
+    amount:Number(document.getElementById('amount').value),
+    rate:Number(document.getElementById('rate').value)||0,
+    installment:Number(document.getElementById('installment').value)||0,
+    due:document.getElementById('due').value
+  };
+  if(id)data.debts=data.debts.map(x=>x.id===id?d:x);
+  else data.debts.push(d);
+  closeModal();save();
+}
+
+function editDebt(id){
+  let d=data.debts.find(x=>x.id===id);if(!d)return;
+  document.getElementById('editId').value=id;
+  document.getElementById('name').value=d.name;
+  document.getElementById('type').value=d.type;
+  document.getElementById('amount').value=d.amount;
+  document.getElementById('rate').value=d.rate||'';
+  document.getElementById('installment').value=d.installment||'';
+  document.getElementById('due').value=d.due||'';
+  document.getElementById('modalTitle').textContent='Borcu Düzenle';
+  document.getElementById('debtModal').classList.add('show')
+}
+
+function deleteDebt(id){
+  if(!confirm('Bu borcu ve ona ait ödeme kayıtlarını silmek istiyor musunuz?'))return;
+  data.debts=data.debts.filter(d=>d.id!==id);
+  data.payments=data.payments.filter(p=>p.debtId!==id);
+  save();
+}
+
+function openPay(id){
+  let d=data.debts.find(x=>x.id===id);if(!d)return;
+  document.getElementById('payId').value=id;
+  document.getElementById('payAmount').value='';
+  document.getElementById('payAmount').max=remaining(d);
+  document.getElementById('payDate').value=today();
+  document.getElementById('payNote').value='';
+  document.getElementById('payModal').classList.add('show')
+}
+function closePay(){document.getElementById('payModal').classList.remove('show')}
+
+function savePayment(e){
+  e.preventDefault();
+  let id=document.getElementById('payId').value, amount=Number(document.getElementById('payAmount').value), d=data.debts.find(x=>x.id===id);
+  if(!d||amount<=0||amount>remaining(d)+.001){alert('Ödeme tutarı kalan borçtan büyük olamaz.');return}
+  
+  let pDate = document.getElementById('payDate').value;
+  data.payments.push({id:crypto.randomUUID(), debtId:id, amount, date:pDate, note:document.getElementById('payNote').value.trim()});
+  
+  if(document.getElementById('auto28').checked){
+    d.due = addDays(pDate, 28);
+  }
+  
+  closePay();save();
+}
+
+function backup(){
+  let blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='borctakip-yedek-'+today()+'.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function restore(e){
+  let f=e.target.files[0];if(!f)return;
+  let r=new FileReader();
+  r.onload=()=>{
+    try{
+      let x=JSON.parse(r.result);
+      if(!Array.isArray(x.debts)||!Array.isArray(x.payments))throw 0;
+      if(confirm('Mevcut kayıtların yedek dosyasındaki kayıtlarla değiştirilsin mi?')){
+        data=x;save();alert('Yedek başarıyla geri yüklendi.');
+      }
+    }catch{alert('Geçersiz yedek dosyası.')}
+    e.target.value='';
+  };
+  r.readAsText(f);
+}
+
+function clearAll(){
+  if(confirm('Tüm borç, ödeme ve gider kayıtları kalıcı olarak silinsin mi?')){
+    data={debts:[],payments:[],expenses:[],income:0,phone:''};
+    save();
+  }
+}
+
+function enableReminders(){
+ if(!('Notification' in window)){document.getElementById('notifyStatus').textContent='Bu tarayıcı bildirimleri desteklemiyor.';return}
+ Notification.requestPermission().then(p=>{document.getElementById('notifyStatus').textContent=p==='granted'?'Bildirim izni verildi. Uygulama açıldığında yaklaşan ödemeler kontrol edilir.':'Bildirim izni verilmedi.';checkReminders()});
+}
+
+function checkReminders(){
+ if(!('Notification' in window)||Notification.permission!=='granted')return;
+ let now=new Date();now.setHours(0,0,0,0);
+ data.debts.filter(d=>d.due&&remaining(d)>0).forEach(d=>{
+  let due=new Date(d.due+'T00:00:00'),diff=Math.round((due-now)/86400000);
+  if(diff>=0&&diff<=3){
+   let stamp='bt_notice_'+d.id+'_'+d.due;
+   if(!sessionStorage.getItem(stamp)){new Notification('BorçTakip Ödeme Hatırlatması',{body:d.name+': '+(diff===0?'Bugün':diff+' gün sonra')+' ödeme tarihi. Kalan: '+money(remaining(d))});sessionStorage.setItem(stamp,'1')}
+  }
+ });
+}
+
+document.getElementById('calMonth').value=today().slice(0,7);
+render();
+fetchMarketRates();
+calculateLoan();
+if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+checkReminders();
+window.addEventListener('resize', renderChart);
+</script>
+</body>
+</html>
