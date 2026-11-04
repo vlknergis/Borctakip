@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#101827">
 <link rel="manifest" href="./manifest.webmanifest">
-<title>BorçTakip PRO</title>
+<title>Borç Takip VabsPro</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <style>
 :root{--bg:#f3f6fb;--card:#fff;--ink:#172033;--muted:#718096;--line:#e7edf5;--navy:#101827;--blue:#3568e8;--green:#15966b;--red:#d94b5b;--amber:#c78319;--purple:#7c3aed}
@@ -42,7 +42,7 @@ canvas{width:100%!important;height:100%!important}
 </head>
 <body>
 <header>
-  <div class="top"><div class="brand">◈ BorçTakip PRO</div><div class="tag">KİŞİSEL FİNANS</div></div>
+  <div class="top"><div class="brand">◈ Borç Takip VabsPro</div><div class="tag">KİŞİSEL FİNANS</div></div>
   <div class="total-label">Toplam Kalan Borç</div>
   <div class="total" id="total">₺0,00</div>
   <div class="sub" id="debtCount">Yükleniyor...</div>
@@ -75,8 +75,8 @@ canvas{width:100%!important;height:100%!important}
   <div class="section"><h2>Son İşlemler</h2><span class="small">Ödeme Geçmişi</span></div>
   <div class="card" id="recent"></div>
   
-  <!-- Canlı Piyasa Verileri Bandı (En Altta) -->
-  <div class="section"><h2>Piyasa Durumu <span class="small">(gecikmeli)</span></h2></div>
+  <!-- Canlı Piyasa Verileri Bandı -->
+  <div class="section"><h2>Piyasa Durumu <span class="small">(Gecikmeli Kur)</span></h2></div>
   <div class="ticker-bar" id="tickerBar">
     <div class="ticker-item"><span class="ticker-title">USD / TRY</span><span class="ticker-val" id="usdRate">Yükleniyor...</span></div>
     <div class="ticker-item"><span class="ticker-title">EUR / TRY</span><span class="ticker-val" id="eurRate">Yükleniyor...</span></div>
@@ -88,7 +88,7 @@ canvas{width:100%!important;height:100%!important}
 
 <section id="expenses" class="view">
   <div class="section"><h2>Kira & Fatura / Sabit Giderler</h2><button class="primary" onclick="openExpense()">＋ Gider Ekle</button></div>
-  <div class="card"><div class="small">Aylık düzenli kira, fatura ve abonelik giderleriniz.</div></div>
+  <div class="card"><div class="small">Aylık düzenli kira, fatura ve abonelik giderleriniz. Belirttiğiniz günlerde saat 10:00, 14:00 ve 19:00'da hatırlatılır.</div></div>
   <div class="list" id="expenseList"></div>
 </section>
 
@@ -129,8 +129,8 @@ canvas{width:100%!important;height:100%!important}
   </div>
   <div class="card" id="calendarList"></div>
   <div class="card" style="margin-top:10px">
-    <b>Ödeme Günü Hatırlatmaları</b>
-    <p class="small">Bildirim izni verirseniz yaklaşan ödemeler için uyarı alırsınız.</p>
+    <b>Ödeme ve Gider Hatırlatmaları</b>
+    <p class="small">Bildirim izni verirseniz borçlar, kiralar ve faturalar için günün belirli saatlerinde uyarı alırsınız.</p>
     <button class="primary" onclick="enableReminders()">Bildirimleri Aç</button>
     <div class="small" id="notifyStatus" style="margin-top:8px"></div>
   </div>
@@ -270,7 +270,7 @@ function savePhone(){
   save();
 }
 
-/* CANLI PİYASA KUR VERİLERİ (Güncellenmiş Çarpanlar) */
+/* CANLI PİYASA KUR VERİLERİ */
 async function fetchMarketRates(){
   try {
     let res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
@@ -320,7 +320,7 @@ function sendFeedback(){
   if(!text){alert('Lütfen iletmek istediğiniz öneriyi yazın.');return}
   
   let targetPhone = data.phone || '905551112233';
-  let msg = encodeURIComponent("BorçTakip Uygulaması Önerisi:\n\n" + text);
+  let msg = encodeURIComponent("Borç Takip VabsPro Önerisi:\n\n" + text);
   window.open(`https://wa.me/${targetPhone}?text=${msg}`, '_blank');
   document.getElementById('userSuggestion').value = '';
 }
@@ -418,7 +418,7 @@ function renderExpenses(){
       <div class="row">
         <div>
           <b>${esc(e.name)}</b> <span class="badge badge-fixed">${esc(e.category)}</span>
-          <div class="small">Her ayın ${e.day}. günü</div>
+          <div class="small">Her ayın ${e.day}. günü (10:00, 14:00, 19:00 hatırlatmalı)</div>
         </div>
         <div class="amount purple">${money(e.amount)}</div>
       </div>
@@ -592,7 +592,7 @@ function render(){
     return `<div class="card"><div class="debt"><div class="icon">${d.type==='Kredi kartı'?'💳':d.type==='Ek hesap'?'🏦':'📄'}</div><div class="debt-main"><div class="debt-name">${esc(d.name)} ${d.rate?`<span class="badge badge-debt">%${d.rate} Faiz</span>`:''}</div><div class="debt-meta">${esc(d.type)}${d.due?' · Sonraki ödeme: '+new Date(d.due+'T12:00:00').toLocaleDateString('tr-TR'):''}</div></div><div class="amount">${money(rem)}</div></div><div class="progress"><div class="bar" style="width:${pct}%"></div></div><div class="row" style="margin-top:11px"><span class="small">%${pct.toFixed(0)} ödendi</span><div style="display:flex;gap:6px"><button class="ghost" onclick="editDebt('${d.id}')">Düzenle</button><button class="ghost" onclick="openPay('${d.id}')">＋ Öde</button><button class="danger" onclick="deleteDebt('${d.id}')">Sil</button></div></div></div>`
   }).join(''):'<div class="card empty">Henüz borç kaydın yok.<br>“Borç ekle” butonuyla ilk kaydını oluştur.</div>';
 
-  let recent=[...data.payments].sort((a,b)=>b.date.localeCompare(b.date)).slice(0,4);
+  let recent=[...data.payments].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,4);
   document.getElementById('recent').innerHTML=recent.length?recent.map(p=>`<div class="history-item"><span>${esc(data.debts.find(d=>d.id===p.debtId)?.name||'Silinmiş borç')}<br><span class="small">${p.date} ${p.note?'· '+esc(p.note):''}</span></span><b class="green">−${money(p.amount)}</b></div>`).join(''):'<div class="empty">Henüz ödeme kaydı yok.</div>';
   
   let all=[...data.payments].sort((a,b)=>b.date.localeCompare(a.date));
@@ -713,19 +713,49 @@ function clearAll(){
 
 function enableReminders(){
  if(!('Notification' in window)){document.getElementById('notifyStatus').textContent='Bu tarayıcı bildirimleri desteklemiyor.';return}
- Notification.requestPermission().then(p=>{document.getElementById('notifyStatus').textContent=p==='granted'?'Bildirim izni verildi. Uygulama açıldığında yaklaşan ödemeler kontrol edilir.':'Bildirim izni verilmedi.';checkReminders()});
+ Notification.requestPermission().then(p=>{document.getElementById('notifyStatus').textContent=p==='granted'?'Bildirim izni verildi. Saat 10:00, 14:00 ve 19:00\'da hatırlatmalar kontrol edilir.':'Bildirim izni verilmedi.';});
 }
 
+/* HESAPLANAN SAATLERDE KONTROL (10:00, 14:00, 19:00) */
 function checkReminders(){
  if(!('Notification' in window)||Notification.permission!=='granted')return;
- let now=new Date();now.setHours(0,0,0,0);
- data.debts.filter(d=>d.due&&remaining(d)>0).forEach(d=>{
-  let due=new Date(d.due+'T00:00:00'),diff=Math.round((due-now)/86400000);
-  if(diff>=0&&diff<=3){
-   let stamp='bt_notice_'+d.id+'_'+d.due;
-   if(!sessionStorage.getItem(stamp)){new Notification('BorçTakip Ödeme Hatırlatması',{body:d.name+': '+(diff===0?'Bugün':diff+' gün sonra')+' ödeme tarihi. Kalan: '+money(remaining(d))});sessionStorage.setItem(stamp,'1')}
-  }
- });
+ 
+ let now = new Date();
+ let currentDay = now.getDate();
+ let currentHour = now.getHours();
+ let currentMinute = now.getMinutes();
+ 
+ // Sadece saat 10:00, 14:00 veya 19:00 olduğunda (ilk 5 dakika içinde) kontrol et
+ if((currentHour === 10 || currentHour === 14 || currentHour === 19) && currentMinute <= 5){
+   let dateKey = today() + '_' + currentHour;
+   
+   // Aynı saatte mükerrer bildirim gitmesini engelle
+   if(!sessionStorage.getItem(dateKey)){
+     
+     // 1. Gider/Kira Kontrolü
+     data.expenses.forEach(e=>{
+       if(e.day === currentDay){
+         new Notification('VabsPro Sabit Gider Hatırlatması', {
+           body: `${e.name} (${e.category}) için bugün son ödeme günü! Tutar: ${money(e.amount)}`
+         });
+       }
+     });
+
+     // 2. Yaklaşan Borçlar Kontrolü
+     data.debts.forEach(d=>{
+       if(d.due && remaining(d) > 0){
+         let dueDay = new Date(d.due + 'T00:00:00').getDate();
+         if(dueDay === currentDay){
+           new Notification('VabsPro Borç Hatırlatması', {
+             body: `${d.name} borcunun ödeme günü bugün! Kalan: ${money(remaining(d))}`
+           });
+         }
+       }
+     });
+
+     sessionStorage.setItem(dateKey, '1');
+   }
+ }
 }
 
 document.getElementById('calMonth').value=today().slice(0,7);
@@ -733,7 +763,10 @@ render();
 fetchMarketRates();
 calculateLoan();
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
-checkReminders();
+
+// Her 5 dakikada bir hatırlama saatlerini kontrol et
+setInterval(checkReminders, 300000);
+
 window.addEventListener('resize', renderChart);
 </script>
 </body>
