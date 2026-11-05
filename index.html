@@ -62,6 +62,11 @@ canvas{width:100%!important;height:100%!important}
       <div class="stat-val" id="netBudget">₺0,00</div>
     </div>
   </div>
+  <div class="card">
+    <div class="row"><b>Aylık Tasarruf Hedefi</b><b id="savingsGoalValue">Belirlenmedi</b></div>
+    <div style="height:10px;background:var(--line);border-radius:10px;overflow:hidden;margin:12px 0 7px"><div id="savingsGoalBar" style="height:100%;width:0%;background:#159b79;border-radius:10px"></div></div>
+    <div class="row"><span class="small" id="savingsGoalStatus">Ayarlar bölümünden aylık hedef belirleyebilirsin.</span><span class="small" id="savingsGoalPercent">%0</span></div>
+  </div>
 
   <div class="section"><h2>Borçlarım</h2><button class="primary" onclick="openDebt()">＋ Borç Ekle</button></div>
   <div class="list" id="debtList"></div>
@@ -219,6 +224,12 @@ canvas{width:100%!important;height:100%!important}
       <label><b>Geliştirici WhatsApp Numarası</b></label>
       <input id="phoneInput" type="tel" placeholder="Örn. 905551112233" onchange="savePhone()">
     </div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+    <div class="field">
+      <label><b>Aylık tasarruf hedefi (₺)</b></label>
+      <div class="small">Her ay kenara ayırmak istediğin tutarı belirle. Ana ekrandaki ilerleme, ayın gelirinden sabit giderleri, günlük harcamaları ve kaydedilmiş borç ödemelerini düşerek hesaplanır.</div>
+      <input id="savingsGoalInput" type="number" min="0" step="500" placeholder="Örn. 5000" onchange="saveSavingsGoal()">
+    </div>
   </div>
   <div class="card">
     <b>Yedekleme Merkezi</b>
@@ -296,7 +307,7 @@ canvas{width:100%!important;height:100%!important}
 <script>
 const LEGACY_KEY='borctakip_v1';
 const KEY='borctakip_v2';
-const EMPTY_DATA={debts:[],payments:[],expenses:[],expensePayments:[],incomes:[],spendings:[],income:0,phone:''};
+const EMPTY_DATA={debts:[],payments:[],expenses:[],expensePayments:[],incomes:[],spendings:[],income:0,phone:'',monthlySavingsGoal:0};
 
 function readStoredData(key){
   try {
@@ -322,6 +333,7 @@ if(!Array.isArray(data.expensePayments)) data.expensePayments=[];
 if(!Array.isArray(data.incomes)) data.incomes=[];
 if(!Array.isArray(data.spendings)) data.spendings=[];
 if(!Number.isFinite(Number(data.income))) data.income=0;
+if(!Number.isFinite(Number(data.monthlySavingsGoal))||Number(data.monthlySavingsGoal)<0)data.monthlySavingsGoal=0;
 if(!data.phone) data.phone='';
 if(!currentData && legacyData){
   try { localStorage.setItem(KEY,JSON.stringify(data)); }
@@ -477,6 +489,14 @@ function saveIncome(){
 
 function savePhone(){
   data.phone = document.getElementById('phoneInput').value.trim();
+  save();
+}
+
+function saveSavingsGoal(){
+  const input=document.getElementById('savingsGoalInput');
+  const value=Number(input.value);
+  if(!Number.isFinite(value)||value<0){alert('Tasarruf hedefi sıfır veya pozitif olmalı.');input.value=data.monthlySavingsGoal||0;return;}
+  data.monthlySavingsGoal=value;
   save();
 }
 
@@ -974,6 +994,7 @@ function setPaymentMonth(offset){
 function render(){
   document.getElementById('incomeInput').value = data.income || '';
   document.getElementById('phoneInput').value = data.phone || '';
+  const savingsInput=document.getElementById('savingsGoalInput');if(savingsInput)savingsInput.value=data.monthlySavingsGoal||'';
   let total=data.debts.reduce((s,d)=>s+remaining(d),0);
   document.getElementById('total').textContent=money(total);
   document.getElementById('debtCount').textContent=data.debts.length?data.debts.length+' aktif borç kaydı':'Henüz borç eklenmedi';
@@ -990,6 +1011,19 @@ function render(){
   let netEl = document.getElementById('netBudget');
   netEl.textContent = money(net);
   netEl.className = 'stat-val ' + (net>=0 ? 'green' : 'red');
+  const goal=Number(data.monthlySavingsGoal)||0;
+  const goalValue=document.getElementById('savingsGoalValue');
+  const goalBar=document.getElementById('savingsGoalBar');
+  const goalStatus=document.getElementById('savingsGoalStatus');
+  const goalPercent=document.getElementById('savingsGoalPercent');
+  if(goalValue&&goalBar&&goalStatus&&goalPercent){
+    const progress=goal>0?Math.max(0,Math.min(100,net/goal*100)):0;
+    goalValue.textContent=goal>0?money(goal):'Belirlenmedi';
+    goalBar.style.width=progress.toFixed(1)+'%';
+    goalBar.style.background=net>=goal&&goal>0?'#159b79':'#3568e8';
+    goalStatus.textContent=goal===0?'Ayarlar bölümünden aylık hedef belirleyebilirsin.':net<0?'Bu ay bütçe açığı var.':money(Math.max(0,goal-net))+' hedefe kalan';
+    goalPercent.textContent='%'+progress.toFixed(0);
+  }
 
   let soon=data.debts.filter(d=>d.due&&d.due>=today()&&d.due<=addDays(today(),30)).reduce((s,d)=>s+Math.min(remaining(d),d.installment||remaining(d)),0);
   document.getElementById('upcoming').textContent=money(soon);
