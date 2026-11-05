@@ -68,8 +68,13 @@ canvas{width:100%!important;height:100%!important}
 
   <div class="section"><h2>Grafik & Analiz</h2><span class="small">Ödeme Özetleri</span></div>
   <div class="card">
-    <div class="small">Son 6 Ay Ödeme Trendi</div>
+    <div class="small">Son 6 Ay Borç Ödeme Trendi</div>
     <div class="chart-container"><canvas id="payChart"></canvas></div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+    <div class="small">Son 6 Ay Gelir – Gider Karşılaştırması</div>
+    <div class="small" style="margin:5px 0 10px">Gelir ile sabit gider, günlük harcama ve borç ödemelerinin toplamı karşılaştırılır.</div>
+    <div class="chart-container"><canvas id="cashChart"></canvas></div>
+    <div class="small" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px"><span>🟦 Gelir</span><span>🟥 Toplam çıkış</span></div>
   </div>
 
   <div class="section"><h2>Son İşlemler</h2><span class="small">Ödeme Geçmişi</span></div>
@@ -926,6 +931,29 @@ function renderChart(){
     ctx.fillStyle="#718096";
     ctx.textAlign="center";
     ctx.fillText(months[i].slice(5), x + barW/2, h - 8);
+  });
+
+  const cash=document.getElementById('cashChart');
+  if(!cash)return;
+  const cctx=cash.getContext('2d'),cdpr=window.devicePixelRatio||1;
+  cash.width=cash.offsetWidth*cdpr;cash.height=cash.offsetHeight*cdpr;
+  cctx.setTransform(cdpr,0,0,cdpr,0,0);
+  const cw=cash.offsetWidth,ch=cash.offsetHeight;
+  cctx.clearRect(0,0,cw,ch);
+  const income=months.map(m=>(Number(data.income)||0)+monthlyIncome(m));
+  const outgoing=months.map(m=>
+    (data.expenses||[]).reduce((s,e)=>s+(Number(e.amount)||0),0)+
+    monthlySpending(m)+
+    data.payments.filter(p=>p.date&&p.date.startsWith(m)).reduce((s,p)=>s+(Number(p.amount)||0),0)
+  );
+  const top=Math.max(1000,...income,...outgoing),groupW=(cw-48)/6,base=ch-25,plotH=ch-48;
+  cctx.font="10px system-ui";cctx.textAlign="center";
+  months.forEach((m,i)=>{
+    const x=30+i*groupW,bw=Math.max(5,groupW*.27);
+    const ih=income[i]/top*plotH,oh=outgoing[i]/top*plotH;
+    cctx.fillStyle="#3568e8";cctx.fillRect(x+groupW*.18,base-ih,bw,ih);
+    cctx.fillStyle="#dc5252";cctx.fillRect(x+groupW*.55,base-oh,bw,oh);
+    cctx.fillStyle="#718096";cctx.fillText(m.slice(5),x+groupW/2,ch-7);
   });
 }
 
