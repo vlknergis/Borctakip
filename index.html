@@ -413,7 +413,7 @@ async function cloudRefreshBackupInfo(){
     details.textContent='Son yedek: '+cloudFormatDate(current.updated_at)+' · Toplam '+backupRecordCount(current.payload)+' kayıt · Revizyon '+current.revision+'\n'+cloudCategoryCounts(current.payload)+'\nToplam borç: '+money(amounts.original)+' · Ödenen: '+money(amounts.original-amounts.remaining)+' · Kalan borç: '+money(amounts.remaining);
    }else details.textContent='Bulutta henüz kayıtlı yedek yok.';
   }
-  const {data:history,error}=await cloudClient.from('user_backup_history').select('id,payload,source_revision,created_at').eq('user_id',user.id).order('created_at',{ascending:false}).limit(5);
+  const {data:history,error}=await cloudClient.from('user_backup_history').select('id,payload,source_revision,created_at').eq('user_id',user.id).order('created_at',{ascending:false}).limit(3);
   if(error)throw error;
   if(historyEl){
    historyEl.replaceChildren();
