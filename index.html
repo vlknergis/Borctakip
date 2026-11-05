@@ -68,6 +68,14 @@ canvas{width:100%!important;height:100%!important}
     <div class="row"><span class="small" id="savingsGoalStatus">Ayarlar bölümünden aylık hedef belirleyebilirsin.</span><span class="small" id="savingsGoalPercent">%0</span></div>
   </div>
 
+  <div class="card">
+    <div class="row"><b>Borç Azaltma Performansı</b><b id="debtProgressPercent">%0</b></div>
+    <div style="height:10px;background:var(--line);border-radius:10px;overflow:hidden;margin:12px 0 7px"><div id="debtProgressBar" style="height:100%;width:0%;background:#159b79;border-radius:10px"></div></div>
+    <div class="row"><span class="small">Başlangıç borcu</span><b id="debtOriginalTotal">₺0,00</b></div>
+    <div class="row"><span class="small">Bu borçlara yapılan ödemeler</span><b id="debtPaidTotal" class="green">₺0,00</b></div>
+    <div class="row"><span class="small">Kalan borç</span><b id="debtRemainingTotal" class="red">₺0,00</b></div>
+    <div class="small" id="debtProgressNote" style="margin-top:8px">Borç eklediğinde ödeme ilerlemen burada görünür.</div>
+  </div>
   <div class="section"><h2>Borçlarım</h2><button class="primary" onclick="openDebt()">＋ Borç Ekle</button></div>
   <div class="list" id="debtList"></div>
 
@@ -998,6 +1006,22 @@ function render(){
   let total=data.debts.reduce((s,d)=>s+remaining(d),0);
   document.getElementById('total').textContent=money(total);
   document.getElementById('debtCount').textContent=data.debts.length?data.debts.length+' aktif borç kaydı':'Henüz borç eklenmedi';
+  const debtOriginal=data.debts.reduce((sum,d)=>sum+(Number(d.amount)||0),0);
+  const activeDebtIds=new Set(data.debts.map(d=>d.id));
+  const debtPaid=data.payments.filter(p=>activeDebtIds.has(p.debtId)).reduce((sum,p)=>sum+(Number(p.amount)||0),0);
+  const debtProgress=debtOriginal>0?Math.max(0,Math.min(100,debtPaid/debtOriginal*100)):0;
+  const progressBar=document.getElementById('debtProgressBar');
+  const progressPercent=document.getElementById('debtProgressPercent');
+  const originalEl=document.getElementById('debtOriginalTotal');
+  const paidEl=document.getElementById('debtPaidTotal');
+  const remainingEl=document.getElementById('debtRemainingTotal');
+  const progressNote=document.getElementById('debtProgressNote');
+  if(progressBar)progressBar.style.width=debtProgress.toFixed(1)+'%';
+  if(progressPercent)progressPercent.textContent='%'+debtProgress.toFixed(0);
+  if(originalEl)originalEl.textContent=money(debtOriginal);
+  if(paidEl)paidEl.textContent=money(debtPaid);
+  if(remainingEl)remainingEl.textContent=money(total);
+  if(progressNote)progressNote.textContent=debtOriginal>0?'Kayıtlı aktif borçlarının '+debtProgress.toFixed(1)+'%’ini ödedin.':'Borç eklediğinde ödeme ilerlemen burada görünür.';
 
   let month=today().slice(0,7);
   let paid=data.payments.filter(p=>p.date?.startsWith(month)).reduce((s,p)=>s+p.amount,0);
