@@ -142,10 +142,11 @@ canvas{width:100%!important;height:100%!important}
     <h2>Aylık Takvim</h2>
     <input id="calMonth" type="month" onchange="renderCalendar()" style="max-width:145px;padding:8px;border:1px solid var(--line);border-radius:9px">
   </div>
+  <div class="card"><b>Geciken ve Yaklaşan Ödemeler</b><div id="calendarAlerts" style="margin-top:10px"><div class="small">Ödeme kayıtları yükleniyor...</div></div></div>
   <div class="card" id="calendarList"></div>
   <div class="card" style="margin-top:10px">
     <b>Ödeme ve Gider Hatırlatmaları</b>
-    <p class="small">Bildirim izni verirseniz borçlar, kiralar ve faturalar için günün belirli saatlerinde uyarı alırsınız.</p>
+    <p class="small">Hatırlatmalar yalnızca uygulama açıkken kontrol edilir. Uygulama kapalıyken bildirim garantisi yoktur.</p>
     <button class="primary" onclick="enableReminders()">Bildirimleri Aç</button>
     <div class="small" id="notifyStatus" style="margin-top:8px"></div>
   </div>
@@ -613,7 +614,7 @@ function renderExpenses(){
       <div class="row">
         <div>
           <b>${esc(e.name)}</b> <span class="badge badge-fixed">${esc(e.category)}</span>
-          <div class="small">Her ayın ${e.day}. günü (10:00, 14:00, 19:00 hatırlatmalı)</div>
+          <div class="small">Her ayın ${e.day}. günü · Uygulama açıkken hatırlatma</div>
         </div>
         <div class="amount purple">${money(e.amount)}</div>
       </div>
@@ -629,27 +630,29 @@ function renderExpenses(){
 }
 
 /* TAKVİM VE PLANLAMA */
-function renderCalendar(){
- const m=document.getElementById('calMonth').value||today().slice(0,7);
- const debts=data.debts.filter(d=>d.due&&d.due.slice(0,7)===m&&remaining(d)>0).map(d=>({
-   date: d.due, name: d.name, type: d.type, amt: Math.min(remaining(d), d.installment||remaining(d)), isDebt: true
- }));
- const exps=data.expenses.map(e=>({
-   date: m + '-' + (e.day<10?'0'+e.day:e.day), name: e.name, type: e.category, amt: e.amount, isDebt: false
- }));
- const all=[...debts, ...exps].sort((a,b)=>a.date.localeCompare(b.date));
- 
- document.getElementById('calendarList').innerHTML=all.length?all.map(d=>`
-  <div class="history-item">
-    <span>
-      <b>${new Date(d.date+'T12:00:00').toLocaleDateString('tr-TR',{day:'numeric',month:'long'})}</b>
-      <span class="badge ${d.isDebt?'badge-debt':'badge-fixed'}">${d.isDebt?'Borç':'Gider'}</span><br>
-      <span class="small">${esc(d.name)} (${esc(d.type)})</span>
-    </span>
-    <b>${money(d.amt)}</b>
-  </div>`).join(''):'<div class="empty">Bu ay için ödeme veya gider bulunmuyor.</div>';
+function monthlyExpenseDate(month,day){
+ const parts=month.split('-').map(Number),year=parts[0],monthNo=parts[1];
+ const lastDay=new Date(year,monthNo,0).getDate();
+ return month+'-'+String(Math.min(Math.max(1,Number(day)||1),lastDay)).padStart(2,'0');
 }
-
+function calendarEvents(month){
+ const debts=data.debts.filter(d=>d.due&&d.due.slice(0,7)===month&&remaining(d)>0).map(d=>({date:d.due,name:d.name,type:d.type,amt:Math.min(remaining(d),d.installment||remaining(d)),isDebt:true}));
+ const exps=data.expenses.map(e=>({date:monthlyExpenseDate(month,e.day),name:e.name,type:e.category,amt:Number(e.amount)||0,isDebt:false}));
+ return [...debts,...exps].sort((a,b)=>a.date.localeCompare(b.date));
+}
+function renderCalendar(){
+ const m=document.getElementById('calMonth').value||today().slice(0,7),now=today(),all=calendarEvents(m);
+ const overdue=data.debts.filter(d=>d.due&&d.due<now&&remaining(d)>0).map(d=>({date:d.due,name:d.name,amt:Math.min(remaining(d),d.installment||remaining(d))}));
+ const end=addDays(now,7),next=[];
+ [now.slice(0,7),end.slice(0,7)].filter((v,i,a)=>a.indexOf(v)===i).forEach(month=>calendarEvents(month).forEach(item=>{if(item.date>=now&&item.date<=end)next.push(item)}));
+ const alerts=document.getElementById('calendarAlerts');
+ if(alerts){
+  const overdueHtml=overdue.length?overdue.map(d=>'<div class="history-item"><span><b class="red">'+esc(d.name)+'</b><br><span class="small">Geciken borç · Vade: '+d.date+'</span></span><b class="red">'+money(d.amt)+'</b></div>').join(''):'<div class="small green">Gecikmiş borç kaydı görünmüyor.</div>';
+  const nextHtml=next.length?next.map(d=>'<div class="history-item"><span><b>'+esc(d.name)+'</b><br><span class="small">'+(d.isDebt?'Borç ödemesi':'Sabit gider')+' · '+d.date+'</span></span><b>'+money(d.amt)+'</b></div>').join(''):'<div class="small">Önümüzdeki 7 gün içinde kayıtlı vade bulunmuyor.</div>';
+  alerts.innerHTML='<b class="small">Geciken borçlar</b>'+overdueHtml+'<div style="height:12px"></div><b class="small">Önümüzdeki 7 gün</b>'+nextHtml+'<p class="small">Sabit giderler için ödeme yapıldı bilgisi tutulmadığından bunlar vade hatırlatmasıdır; ödenmiş/ödenmemiş durumunu göstermez.</p>';
+ }
+ document.getElementById('calendarList').innerHTML=all.length?all.map(d=>'<div class="history-item"><span><b>'+new Date(d.date+'T12:00:00').toLocaleDateString('tr-TR',{day:'numeric',month:'long'})+'</b> <span class="badge '+(d.isDebt?'badge-debt':'badge-fixed')+'">'+(d.isDebt?'Borç':'Gider')+'</span><br><span class="small">'+esc(d.name)+' ('+esc(d.type)+')</span></span><b>'+money(d.amt)+'</b></div>').join(''):'<div class="empty">Bu ay için ödeme veya gider bulunmuyor.</div>';
+}
 function renderPlan(){
  const budget=Number(document.getElementById('monthlyBudget').value)||0;
  const strategy=document.getElementById('strategy').value;
@@ -952,42 +955,20 @@ function clearAll(){
 
 function enableReminders(){
  if(!('Notification' in window)){document.getElementById('notifyStatus').textContent='Bu tarayıcı bildirimleri desteklemiyor.';return}
- Notification.requestPermission().then(p=>{document.getElementById('notifyStatus').textContent=p==='granted'?'Bildirim izni verildi. Saat 10:00, 14:00 ve 19:00\'da hatırlatmalar kontrol edilir.':'Bildirim izni verilmedi.';});
+ Notification.requestPermission().then(p=>{
+  document.getElementById('notifyStatus').textContent=p==='granted'?'Bildirim izni verildi. Hatırlatmalar yalnızca uygulama açıkken saat 10:00, 14:00 ve 19:00 civarında kontrol edilir.':'Bildirim izni verilmedi.';
+  if(p==='granted')checkReminders();
+ });
 }
-
 function checkReminders(){
  if(!('Notification' in window)||Notification.permission!=='granted')return;
- 
- let now = new Date();
- let currentDay = now.getDate();
- let currentHour = now.getHours();
- let currentMinute = now.getMinutes();
- 
- if((currentHour === 10 || currentHour === 14 || currentHour === 19) && currentMinute <= 5){
-   let dateKey = today() + '_' + currentHour;
-   if(!sessionStorage.getItem(dateKey)){
-     data.expenses.forEach(e=>{
-       if(e.day === currentDay){
-         new Notification('VabsPro Sabit Gider Hatırlatması', {
-           body: `${e.name} (${e.category}) için bugün son ödeme günü! Tutar: ${money(e.amount)}`
-         });
-       }
-     });
-
-     data.debts.forEach(d=>{
-       if(d.due && remaining(d) > 0){
-         let dueDay = new Date(d.due + 'T00:00:00').getDate();
-         if(dueDay === currentDay){
-           new Notification('VabsPro Borç Hatırlatması', {
-             body: `${d.name} borcunun ödeme günü bugün! Kalan: ${money(remaining(d))}`
-           });
-         }
-       }
-     });
-
-     sessionStorage.setItem(dateKey, '1');
-   }
- }
+ const now=new Date(),hour=now.getHours(),minute=now.getMinutes();
+ if(![10,14,19].includes(hour)||minute>5)return;
+ const key='borctakip_reminder_'+today()+'_'+hour;
+ try{if(localStorage.getItem(key))return}catch(error){}
+ data.expenses.forEach(e=>{if(monthlyExpenseDate(today().slice(0,7),e.day)===today())new Notification('BorçTakip sabit gider hatırlatması',{body:e.name+' ('+e.category+') için bugün vade günü. Tutar: '+money(e.amount),tag:'expense-'+e.id+'-'+today()})});
+ data.debts.forEach(d=>{if(d.due===today()&&remaining(d)>0)new Notification('BorçTakip borç ödeme hatırlatması',{body:d.name+' borcunun vadesi bugün. Kalan borç: '+money(remaining(d)),tag:'debt-'+d.id+'-'+today()})});
+ try{localStorage.setItem(key,String(Date.now()))}catch(error){}
 }
 
 document.getElementById('calMonth').value=today().slice(0,7);
@@ -996,6 +977,8 @@ fetchMarketRates();
 calculateLoan();
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 checkReminders();
+setInterval(checkReminders,60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkReminders();});
 window.addEventListener('resize', renderChart);
 </script>
 </body>
