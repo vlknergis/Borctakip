@@ -240,21 +240,46 @@ canvas{width:100%!important;height:100%!important}
 <div class="actions"><button type="button" class="secondary" onclick="closePay()">Vazgeç</button><button class="primary">Ödemeyi Kaydet</button></div></form></div></div>
 
 <script>
-const KEY='borctakip_v1';
-let raw=localStorage.getItem(KEY);
-let data=raw?JSON.parse(raw):{debts:[],payments:[],expenses:[],income:0,phone:''};
-if(!data.expenses) data.expenses=[];
-if(!data.income) data.income=0;
+const LEGACY_KEY='borctakip_v1';
+const KEY='borctakip_v2';
+const EMPTY_DATA={debts:[],payments:[],expenses:[],income:0,phone:''};
+
+function readStoredData(key){
+  try {
+    const value=localStorage.getItem(key);
+    if(!value) return null;
+    const parsed=JSON.parse(value);
+    if(!parsed || typeof parsed!=='object' || Array.isArray(parsed)) return null;
+    return parsed;
+  } catch(error) {
+    console.warn('BorçTakip kayıtları okunamadı:',key,error);
+    return null;
+  }
+}
+
+// Önce yeni kayıtları oku. Yoksa eski kayıtları kopyala; eski anahtarı SİLME.
+const currentData=readStoredData(KEY);
+const legacyData=currentData?null:readStoredData(LEGACY_KEY);
+let data=currentData||legacyData||{...EMPTY_DATA};
+if(!Array.isArray(data.debts)) data.debts=[];
+if(!Array.isArray(data.payments)) data.payments=[];
+if(!Array.isArray(data.expenses)) data.expenses=[];
+if(!Number.isFinite(Number(data.income))) data.income=0;
 if(!data.phone) data.phone='';
+if(!currentData && legacyData){
+  try { localStorage.setItem(KEY,JSON.stringify(data)); }
+  catch(error) { console.warn('Yeni kayıt alanına geçiş yapılamadı; eski kayıtlar korunuyor.',error); }
+}
 
 const money=n=>new Intl.NumberFormat('tr-TR',{style:'currency',currency:'TRY'}).format(Number(n)||0);
-const today=()=>new Date().toISOString().slice(0,10);
+const dateKey=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
+const today=()=>dateKey(new Date());
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 function addDays(dateStr, days) {
   let d = new Date(dateStr + 'T12:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0,10);
+  return dateKey(d);
 }
 
 function save(){localStorage.setItem(KEY,JSON.stringify(data));render()}
@@ -278,11 +303,10 @@ async function fetchMarketRates(){
     if(d && d.rates && d.rates.TRY){
       let usdTry = d.rates.TRY;
       let eurTry = usdTry / d.rates.EUR;
-      let goldGram = usdTry * 128; // Belirttiğin altın oran katsayısı
-
+      
       document.getElementById('usdRate').textContent = usdTry.toFixed(3) + ' ₺';
       document.getElementById('eurRate').textContent = eurTry.toFixed(3) + ' ₺';
-      document.getElementById('goldRate').textContent = money(goldGram);
+      document.getElementById('goldRate').textContent = 'Kaynak gerekli';
       return;
     }
     throw new Error();
@@ -293,16 +317,15 @@ async function fetchMarketRates(){
       let d2 = await res2.json();
       let usd = d2.rates.TRY;
       let eur = usd / d2.rates.EUR;
-      let gold = usd * 128;
 
       document.getElementById('usdRate').textContent = usd.toFixed(3) + ' ₺';
       document.getElementById('eurRate').textContent = eur.toFixed(3) + ' ₺';
-      document.getElementById('goldRate').textContent = money(gold);
+      document.getElementById('goldRate').textContent = 'Kaynak gerekli';
     } catch(err){
-      // İnternet veya CORS engeli durumunda güncel varsayılanlar
-      document.getElementById('usdRate').textContent = '50,170 ₺';
-      document.getElementById('eurRate').textContent = '56,265 ₺';
-      document.getElementById('goldRate').textContent = '6.455,00 ₺';
+      // Bağlantı yoksa tahmini veya sabit fiyat gösterme.
+      document.getElementById('usdRate').textContent = 'Bağlantı yok';
+      document.getElementById('eurRate').textContent = 'Bağlantı yok';
+      document.getElementById('goldRate').textContent = 'Veri yok';
     }
   }
 }
@@ -555,7 +578,7 @@ function renderChart(){
   let months=[];
   for(let i=5;i>=0;i--){
     let d=new Date(); d.setMonth(d.getMonth()-i);
-    months.push(d.toISOString().slice(0,7));
+    months.push(dateKey(d).slice(0,7));
   }
 
   let totals=months.map(m=>data.payments.filter(p=>p.date&&p.date.startsWith(m)).reduce((s,p)=>s+p.amount,0));
@@ -601,7 +624,7 @@ function render(){
   netEl.textContent = money(net);
   netEl.className = 'stat-val ' + (net>=0 ? 'green' : 'red');
 
-  let soon=data.debts.filter(d=>d.due&&d.due>=today()&&d.due<=new Date(Date.now()+30*86400000).toISOString().slice(0,10)).reduce((s,d)=>s+Math.min(remaining(d),d.installment||remaining(d)),0);
+  let soon=data.debts.filter(d=>d.due&&d.due>=today()&&d.due<=addDays(today(),30)).reduce((s,d)=>s+Math.min(remaining(d),d.installment||remaining(d)),0);
   document.getElementById('upcoming').textContent=money(soon);
 
   let list=document.getElementById('debtList');
@@ -611,7 +634,7 @@ function render(){
   }).join(''):'<div class="card empty">Henüz borç kaydın yok.<br>“Borç ekle” butonuyla ilk kaydını oluştur.</div>';
 
   let recent=[...data.payments].sort((a,b)=>b.date.localeCompare(b.date)).slice(0,4);
-  document.getElementById('recent').innerHTML=recent.length?recent.map(p=>`<div class="history-item"><span>${esc(data.debts.find(d=>d.id===p.debtId)?.name||'Silinmiş borç')}<br><span class="small">${p.date} ${p.note?'· '+esc(p.note):''}</span></span><b class="green">−${money(p.amount)}</b></div>`).join(''):'<div class="empty">Henüz ödeme kaydı yok.</div>';
+  document.getElementById('recent').innerHTML=recent.length?recent.map(p=>`<div class="history-item"><span>${esc(data.debts.find(d=>d.id===p.debtId)?.name||p.debtName||'Silinmiş borç')}<br><span class="small">${p.date} ${p.note?'· '+esc(p.note):''}</span></span><b class="green">−${money(p.amount)}</b></div>`).join(''):'<div class="empty">Henüz ödeme kaydı yok.</div>';
   
   let all=[...data.payments].sort((a,b)=>b.date.localeCompare(a.date));
   document.getElementById('paymentCount').textContent=all.length+' işlem';
@@ -666,9 +689,16 @@ function editDebt(id){
 }
 
 function deleteDebt(id){
-  if(!confirm('Bu borcu ve ona ait ödeme kayıtlarını silmek istiyor musunuz?'))return;
+  const debt=data.debts.find(d=>d.id===id);
+  if(!debt)return;
+  if(!confirm('Bu borç listesinden silinecek. Geçmiş ödeme kayıtları korunacak. Devam edilsin mi?'))return;
+  data.payments.forEach(p=>{
+    if(p.debtId===id){
+      p.debtName=p.debtName||debt.name;
+      p.debtId=null;
+    }
+  });
   data.debts=data.debts.filter(d=>d.id!==id);
-  data.payments=data.payments.filter(p=>p.debtId!==id);
   save();
 }
 
