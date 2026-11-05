@@ -1306,8 +1306,8 @@ function updateConnectionStatus(){
  const pill=document.getElementById('connectionPill'),label=document.getElementById('connectionLabel'),detail=document.getElementById('connectionDetail');
  if(!pill||!label||!detail)return;
  pill.classList.toggle('offline',!online);
- label.textContent=online?'İnternet bağlantısı var':'Çevrimdışı mod';
- detail.textContent=online?'Kayıtlar bu cihazda saklanıyor · Bulut eşitleme henüz etkin değil.':'İnternet yok · Kayıtlarını bu cihazda kullanmaya devam edebilirsin.';
+ label.textContent=online?'Ağ bağlantısı var':'Çevrimdışı mod';
+ detail.textContent=online?'Kayıtlar bu cihazda saklanıyor · Bulut eşitleme henüz etkin değil.':'Ağ bağlantısı yok · Kayıtlarını bu cihazda kullanmaya devam edebilirsin.';
 }
 window.addEventListener('online',updateConnectionStatus);
 window.addEventListener('offline',updateConnectionStatus);
