@@ -323,7 +323,6 @@ canvas{width:100%!important;height:100%!important}
 <div class="field"><label>Borç Adı / Kurum</label><input id="name" required placeholder="Örn. Banka Kredisi, KK"></div>
 <div class="field"><label>Borç Türü</label><select id="type"><option>Kredi kartı</option><option>İhtiyaç kredisi</option><option>Konut kredisi</option><option>Taşıt kredisi</option><option>Ek hesap</option><option>Kişisel borç</option><option>Diğer</option></select></div>
 <div class="field"><label>Kalan Güncel Borç Tutarı (₺)</label><input id="amount" type="number" min="0.01" step="0.01" required placeholder="0"></div>
-<div class="field"><label>Aylık Akdi Faiz Oranı (%) – isteğe bağlı</label><input id="rate" type="number" min="0" step="0.01" placeholder="Örn. 3.89"></div>
 <div class="field"><label>Aylık Taksit / Asgari Tutar (₺)</label><input id="installment" type="number" min="0" step="0.01" placeholder="0"></div>
 <div class="field"><label>Sonraki Ödeme Tarihi</label><input id="due" type="date"></div>
 <div class="actions"><button class="secondary" type="button" onclick="closeModal()">Vazgeç</button><button class="primary" type="submit">Kaydet</button></div>
@@ -1171,15 +1170,15 @@ function renderPlan(){
 
 function planRateForDebt(d){
  const input=document.getElementById('planRate_'+d.id);
- return Math.max(0,Number(input?input.value:d.rate)||0);
+ return Math.max(0,Number(input?input.value:0)||0);
 }
 function renderPlanRateInputs(activeDebts){
  const wrap=document.getElementById('planRateFields');
  if(!wrap)return;
- const signature=JSON.stringify(activeDebts.map(d=>[d.id,d.name,d.rate]));
+ const signature=JSON.stringify(activeDebts.map(d=>[d.id,d.name]));
  if(wrap.dataset.signature===signature)return;
  wrap.dataset.signature=signature;
- wrap.innerHTML=activeDebts.map(d=>'<div class="field"><label for="planRate_'+esc(d.id)+'">'+esc(d.name)+' · Aylık faiz (%)</label><input id="planRate_'+esc(d.id)+'" type="number" min="0" step="0.01" placeholder="Örn. 3.89" value="'+(Number(d.rate)>0?esc(String(d.rate)):'')+'" oninput="renderPlan()"></div>').join('');
+ wrap.innerHTML=activeDebts.map(d=>'<div class="field"><label for="planRate_'+esc(d.id)+'">'+esc(d.name)+' · Aylık faiz (%)</label><input id="planRate_'+esc(d.id)+'" type="number" min="0" step="0.01" placeholder="Örn. 3.89" value="" oninput="renderPlan()"></div>').join('');
 }
 function simulatePlanScenario(budget,strategy){
  const debts=data.debts.map(d=>({remain:remaining(d),rate:planRateForDebt(d),minPay:Math.max(0,Number(d.installment)||0)})).filter(d=>d.remain>0.005);
@@ -1361,7 +1360,7 @@ function render(){
   let list=document.getElementById('debtList');
   list.innerHTML=data.debts.length?data.debts.map(d=>{
     let rem=remaining(d),pct=d.amount?Math.min(100,(d.amount-rem)/d.amount*100):0;
-    return `<div class="card"><div class="debt"><div class="icon">${d.type==='Kredi kartı'?'💳':d.type==='Ek hesap'?'🏦':'📄'}</div><div class="debt-main"><div class="debt-name">${esc(d.name)} ${d.rate?`<span class="badge badge-debt">%${d.rate} Faiz</span>`:''}</div><div class="debt-meta">${esc(d.type)}${d.due?' · Sonraki ödeme: '+new Date(d.due+'T12:00:00').toLocaleDateString('tr-TR'):''}</div></div><div class="amount">${money(rem)}</div></div><div class="progress"><div class="bar" style="width:${pct}%"></div></div><div class="row" style="margin-top:11px"><span class="small">%${pct.toFixed(0)} ödendi</span><div style="display:flex;gap:6px"><button class="ghost" onclick="editDebt('${d.id}')">Düzenle</button><button class="ghost" onclick="openPay('${d.id}')">＋ Öde</button><button class="danger" onclick="deleteDebt('${d.id}')">Sil</button></div></div></div>`
+    return `<div class="card"><div class="debt"><div class="icon">${d.type==='Kredi kartı'?'💳':d.type==='Ek hesap'?'🏦':'📄'}</div><div class="debt-main"><div class="debt-name">${esc(d.name)}</div><div class="debt-meta">${esc(d.type)}${d.due?' · Sonraki ödeme: '+new Date(d.due+'T12:00:00').toLocaleDateString('tr-TR'):''}</div></div><div class="amount">${money(rem)}</div></div><div class="progress"><div class="bar" style="width:${pct}%"></div></div><div class="row" style="margin-top:11px"><span class="small">%${pct.toFixed(0)} ödendi</span><div style="display:flex;gap:6px"><button class="ghost" onclick="editDebt('${d.id}')">Düzenle</button><button class="ghost" onclick="openPay('${d.id}')">＋ Öde</button><button class="danger" onclick="deleteDebt('${d.id}')">Sil</button></div></div></div>`
   }).join(''):'<div class="card empty">Henüz borç kaydın yok.<br>“Borç ekle” butonuyla ilk kaydını oluştur.</div>';
 
   let recent=[...data.payments].sort((a,b)=>b.date.localeCompare(b.date)).slice(0,4);
@@ -1402,7 +1401,6 @@ function saveDebt(e){
     name:document.getElementById('name').value.trim(),
     type:document.getElementById('type').value,
     amount:Number(document.getElementById('amount').value),
-    rate:Number(document.getElementById('rate').value)||0,
     installment:Number(document.getElementById('installment').value)||0,
     due:document.getElementById('due').value
   };
@@ -1417,7 +1415,6 @@ function editDebt(id){
   document.getElementById('name').value=d.name;
   document.getElementById('type').value=d.type;
   document.getElementById('amount').value=d.amount;
-  document.getElementById('rate').value=d.rate||'';
   document.getElementById('installment').value=d.installment||'';
   document.getElementById('due').value=d.due||'';
   document.getElementById('modalTitle').textContent='Borcu Düzenle';
