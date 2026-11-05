@@ -81,6 +81,15 @@ canvas{width:100%!important;height:100%!important}
   <div class="section"><h2>Borçlarım</h2><button class="primary" onclick="openDebt()">＋ Borç Ekle</button></div>
   <div class="list" id="debtList"></div>
 
+  <div class="section"><h2>Bu Ayki Giderler</h2><span class="small">Borç ekranı özeti</span></div>
+  <div class="card">
+    <div class="row"><span class="small">Sabit giderler</span><b id="homeFixedExpense" class="purple">₺0,00</b></div>
+    <div class="row" style="margin-top:9px"><span class="small">Günlük harcamalar</span><b id="homeDailyExpense" class="red">₺0,00</b></div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:12px 0">
+    <div class="row"><b>Toplam gider</b><b id="homeTotalExpense" class="red">₺0,00</b></div>
+    <div class="small" style="margin-top:6px">Bu ayın günlük harcamaları ve kayıtlı sabit giderlerin toplamı.</div>
+  </div>
+
   <div class="section"><h2>Grafik & Analiz</h2><span class="small">Ödeme Özetleri</span></div>
   <div class="card">
     <div class="small">Son 6 Ay Borç Ödeme Trendi</div>
@@ -1282,6 +1291,13 @@ function render(){
 
   let fixedTotal = data.expenses.reduce((s,e)=>s+e.amount,0);
   document.getElementById('fixedVal').textContent=money(fixedTotal);
+  const homeDailyExpense=monthlySpending(month);
+  const homeFixedExpenseEl=document.getElementById('homeFixedExpense');
+  const homeDailyExpenseEl=document.getElementById('homeDailyExpense');
+  const homeTotalExpenseEl=document.getElementById('homeTotalExpense');
+  if(homeFixedExpenseEl)homeFixedExpenseEl.textContent=money(fixedTotal);
+  if(homeDailyExpenseEl)homeDailyExpenseEl.textContent=money(homeDailyExpense);
+  if(homeTotalExpenseEl)homeTotalExpenseEl.textContent=money(fixedTotal+homeDailyExpense);
 
   let net = (Number(data.income)||0) + monthlyIncome(month) - (paid + fixedTotal + monthlySpending(month));
   let netEl = document.getElementById('netBudget');
