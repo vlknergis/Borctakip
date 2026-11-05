@@ -204,13 +204,13 @@ canvas{width:100%!important;height:100%!important}
 </section>
 
 <section id="plan" class="view">
-  <div class="section"><h2>Faizli Borç Kapatma Planı</h2></div>
+  <div class="section"><h2>Borç Kapatma Planı</h2></div>
   <div class="card">
     <div class="field"><label>Aylık Borç Ödemeye Ayrılan Bütçe (₺)</label><input id="monthlyBudget" type="number" min="0" step="100" placeholder="Örn. 15000" oninput="renderPlan()"></div>
     <div class="field"><label>Kapatma Stratejisi</label>
       <select id="strategy" onchange="renderPlan()">
         <option value="small">Kartopu Yöntemi (En Küçük Borçtan Başla)</option>
-        <option value="rate">Çığ Yöntemi (En Yüksek Faiz Oranından Başla)</option>
+        <option value="large">Büyükten Küçüğe (En Yüksek Borçtan Başla)</option>
       </select>
     </div>
     <div id="planResult" class="small">Borç verilerini ve bütçenizi girdiğinizde simülasyon hesaplanır.</div>
@@ -321,8 +321,8 @@ canvas{width:100%!important;height:100%!important}
 <input type="hidden" id="editId">
 <div class="field"><label>Borç Adı / Kurum</label><input id="name" required placeholder="Örn. Banka Kredisi, KK"></div>
 <div class="field"><label>Borç Türü</label><select id="type"><option>Kredi kartı</option><option>İhtiyaç kredisi</option><option>Konut kredisi</option><option>Taşıt kredisi</option><option>Ek hesap</option><option>Kişisel borç</option><option>Diğer</option></select></div>
-<div class="field"><label>Kalan Güncel Borç Tutarı (₺)</label><input id="amount" type="number" min="0.01" step="0.01" required placeholder="0"></div>
-<div class="field"><label>Aylık Akdi Faiz Oranı (%) – isteğe bağlı</label><input id="rate" type="number" min="0" step="0.01" placeholder="Örn. 3.89"></div>
+<div class="field"><label>Faiz ve masraflar dâhil güncel toplam borç (₺)</label><input id="amount" type="number" min="0.01" step="0.01" required placeholder="Örn. 115000"></div>
+<div class="small">Ana para, birikmiş faiz ve masrafların toplamını gir. Uygulama bu tutar üzerinden işlem yapar; ayrıca faiz eklemez.</div>
 <div class="field"><label>Aylık Taksit / Asgari Tutar (₺)</label><input id="installment" type="number" min="0" step="0.01" placeholder="0"></div>
 <div class="field"><label>Sonraki Ödeme Tarihi</label><input id="due" type="date"></div>
 <div class="actions"><button class="secondary" type="button" onclick="closeModal()">Vazgeç</button><button class="primary" type="submit">Kaydet</button></div>
@@ -943,12 +943,7 @@ function renderSuggestions(){
     }
   }
 
-  if(totalDebt > 0){
-    let maxRateDebt = [...data.debts].sort((a,b)=>(b.rate||0)-(a.rate||0))[0];
-    if(maxRateDebt && maxRateDebt.rate > 0){
-      html += `🎯 <b>Öncelikli Tavsiye:</b> <b>${esc(maxRateDebt.name)}</b> borcunuz %${maxRateDebt.rate} ile en yüksek faiz oranına sahip. İlk olarak bunu kapatmaya odaklanın.<br><br>`;
-    }
-  } else {
+  if(totalDebt <= 0){
     html += '🎉 Aktif borcunuz bulunmuyor. Birikimlerinizi değerlendirebilirsiniz.';
   }
 
@@ -1345,7 +1340,7 @@ function render(){
   let list=document.getElementById('debtList');
   list.innerHTML=data.debts.length?data.debts.map(d=>{
     let rem=remaining(d),pct=d.amount?Math.min(100,(d.amount-rem)/d.amount*100):0;
-    return `<div class="card"><div class="debt"><div class="icon">${d.type==='Kredi kartı'?'💳':d.type==='Ek hesap'?'🏦':'📄'}</div><div class="debt-main"><div class="debt-name">${esc(d.name)} ${d.rate?`<span class="badge badge-debt">%${d.rate} Faiz</span>`:''}</div><div class="debt-meta">${esc(d.type)}${d.due?' · Sonraki ödeme: '+new Date(d.due+'T12:00:00').toLocaleDateString('tr-TR'):''}</div></div><div class="amount">${money(rem)}</div></div><div class="progress"><div class="bar" style="width:${pct}%"></div></div><div class="row" style="margin-top:11px"><span class="small">%${pct.toFixed(0)} ödendi</span><div style="display:flex;gap:6px"><button class="ghost" onclick="editDebt('${d.id}')">Düzenle</button><button class="ghost" onclick="openPay('${d.id}')">＋ Öde</button><button class="danger" onclick="deleteDebt('${d.id}')">Sil</button></div></div></div>`
+    return `<div class="card"><div class="debt"><div class="icon">${d.type==='Kredi kartı'?'💳':d.type==='Ek hesap'?'🏦':'📄'}</div><div class="debt-main"><div class="debt-name">${esc(d.name)}</div><div class="debt-meta">${esc(d.type)}${d.due?' · Sonraki ödeme: '+new Date(d.due+'T12:00:00').toLocaleDateString('tr-TR'):''}</div></div><div class="amount">${money(rem)}</div></div><div class="progress"><div class="bar" style="width:${pct}%"></div></div><div class="row" style="margin-top:11px"><span class="small">%${pct.toFixed(0)} ödendi</span><div style="display:flex;gap:6px"><button class="ghost" onclick="editDebt('${d.id}')">Düzenle</button><button class="ghost" onclick="openPay('${d.id}')">＋ Öde</button><button class="danger" onclick="deleteDebt('${d.id}')">Sil</button></div></div></div>`
   }).join(''):'<div class="card empty">Henüz borç kaydın yok.<br>“Borç ekle” butonuyla ilk kaydını oluştur.</div>';
 
   let recent=[...data.payments].sort((a,b)=>b.date.localeCompare(b.date)).slice(0,4);
@@ -1386,7 +1381,6 @@ function saveDebt(e){
     name:document.getElementById('name').value.trim(),
     type:document.getElementById('type').value,
     amount:Number(document.getElementById('amount').value),
-    rate:Number(document.getElementById('rate').value)||0,
     installment:Number(document.getElementById('installment').value)||0,
     due:document.getElementById('due').value
   };
@@ -1401,7 +1395,6 @@ function editDebt(id){
   document.getElementById('name').value=d.name;
   document.getElementById('type').value=d.type;
   document.getElementById('amount').value=d.amount;
-  document.getElementById('rate').value=d.rate||'';
   document.getElementById('installment').value=d.installment||'';
   document.getElementById('due').value=d.due||'';
   document.getElementById('modalTitle').textContent='Borcu Düzenle';
