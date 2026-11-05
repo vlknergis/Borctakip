@@ -86,7 +86,7 @@ canvas{width:100%!important;height:100%!important}
     <div class="ticker-item"><span class="ticker-title">GRAM ALTIN</span><span class="ticker-val" id="goldRate">Yükleniyor...</span></div>
   </div>
   <div class="small" id="marketUpdated" style="margin:-5px 2px 12px">Döviz ve altın verileri alınıyor...</div>
-  <div class="small" style="margin:-6px 2px 12px">Altın: spot piyasa gram karşılığıdır; kuyumcu alış/satış fiyatı ve işçilik içermez. Kaynak: <a href="https://gold-api.com/" target="_blank" rel="noopener">Gold API</a>.</div>
+  <div class="small" style="margin:-6px 2px 12px">Altın: spot piyasa gram karşılığıdır; kuyumcu alış/satış fiyatı ve işçilik içermez. Döviz kaynağı: <a href="https://cxrates.com/" target="_blank" rel="noopener">CxRates</a>. Altın kaynağı: <a href="https://gold-api.com/" target="_blank" rel="noopener">Gold API</a>.</div>
 
   <p class="notice">Verileriniz cihazınızda saklanır (`borctakip_v2`). Eski kayıtlarınız (`borctakip_v1`) geçiş sırasında silinmez. Düzenli yedek almayı unutmayın.</p>
 </section>
@@ -460,6 +460,7 @@ function savePhone(){
 }
 
 /* CANLI DÖVİZ VE ALTIN VERİLERİ */
+let fxFallbackCache=null,fxFallbackAt=0;
 function formatMarketTime(value){
   if(!value)return 'Zaman bilgisi yok';
   const date=new Date(value);
@@ -473,18 +474,33 @@ async function fetchMarketRates(){
   const goldEl=document.getElementById('goldRate');
   if(status)status.textContent='Piyasa verileri güncelleniyor...';
   const fxPromise=(async()=>{
-    let response=await fetch('https://open.er-api.com/v6/latest/USD');
-    if(!response.ok)throw new Error('Birincil döviz kaynağı yanıt vermedi');
-    let fx=await response.json();
-    if(fx.result!=='success'||!Number.isFinite(Number(fx.rates?.TRY))||!Number.isFinite(Number(fx.rates?.EUR)))throw new Error('Döviz verisi geçersiz');
-    return {usd:Number(fx.rates.TRY),eur:Number(fx.rates.TRY)/Number(fx.rates.EUR),time:fx.time_last_update_utc,source:'ExchangeRate-API'};
-  })().catch(async()=>{
-    const response=await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-    if(!response.ok)throw new Error('Döviz kaynaklarına ulaşılamadı');
-    const fx=await response.json();
-    if(!Number.isFinite(Number(fx.rates?.TRY))||!Number.isFinite(Number(fx.rates?.EUR)))throw new Error('Yedek döviz verisi geçersiz');
-    return {usd:Number(fx.rates.TRY),eur:Number(fx.rates.TRY)/Number(fx.rates.EUR),time:new Date().toISOString(),source:'ExchangeRate-API yedek'};
-  });
+    try{
+      const response=await fetch('https://cxrates.com/api/v1/rates?base=USD&quote=TRY,EUR');
+      if(!response.ok)throw new Error('CxRates yanıt vermedi');
+      const fx=await response.json();
+      const usd=Number(fx.rates?.TRY?.value),usdEur=Number(fx.rates?.EUR?.value);
+      if(!Number.isFinite(usd)||usd<=0||!Number.isFinite(usdEur)||usdEur<=0)throw new Error('Döviz verisi geçersiz');
+      return {
+        usd,eur:usd/usdEur,time:fx.fetched_at,source:'CxRates',
+        usdStale:!!fx.rates.TRY.stale,eurStale:!!fx.rates.EUR.stale,
+        usdSource:fx.rates.TRY.source,eurSource:fx.rates.EUR.source
+      };
+    }catch(primaryError){
+      const now=Date.now();
+      if(fxFallbackCache&&now-fxFallbackAt<3600000)return fxFallbackCache;
+      const response=await fetch('https://open.er-api.com/v6/latest/USD');
+      if(!response.ok)throw new Error('Döviz kaynaklarına ulaşılamadı');
+      const fx=await response.json();
+      if(fx.result!=='success'||!Number.isFinite(Number(fx.rates?.TRY))||!Number.isFinite(Number(fx.rates?.EUR)))throw new Error('Yedek döviz verisi geçersiz');
+      fxFallbackCache={
+        usd:Number(fx.rates.TRY),eur:Number(fx.rates.TRY)/Number(fx.rates.EUR),
+        time:fx.time_last_update_utc,source:'ExchangeRate-API günlük yedek',
+        usdStale:true,eurStale:true
+      };
+      fxFallbackAt=now;
+      return fxFallbackCache;
+    }
+  })();
   const goldPromise=(async()=>{
     try{
       const response=await fetch('https://api.gold-api.com/price/XAU/TRY');
@@ -505,8 +521,8 @@ async function fetchMarketRates(){
   const updateTimes=[];
   if(fxResult.status==='fulfilled'){
     const fx=fxResult.value;
-    usdEl.textContent=fx.usd.toLocaleString('tr-TR',{minimumFractionDigits:3,maximumFractionDigits:3})+' ₺';
-    eurEl.textContent=fx.eur.toLocaleString('tr-TR',{minimumFractionDigits:3,maximumFractionDigits:3})+' ₺';
+    usdEl.textContent=fx.usd.toLocaleString('tr-TR',{minimumFractionDigits:3,maximumFractionDigits:3})+' ₺'+(fx.usdStale?' · eski':'');
+    eurEl.textContent=fx.eur.toLocaleString('tr-TR',{minimumFractionDigits:3,maximumFractionDigits:3})+' ₺'+(fx.eurStale?' · eski':'');
     updateTimes.push('Döviz '+formatMarketTime(fx.time)+' · '+fx.source);
   }else{
     usdEl.textContent='Veri yok';eurEl.textContent='Veri yok';
@@ -514,8 +530,8 @@ async function fetchMarketRates(){
   }
   if(goldResult.status==='fulfilled'){
     const gold=goldResult.value;
-    goldEl.textContent=gold.gram.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₺';
-    updateTimes.push('Altın '+formatMarketTime(gold.time)+' · '+gold.source+(gold.stale?' (son bilinen veri)':''));
+    goldEl.textContent=gold.gram.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₺'+(gold.stale?' · eski':'');
+    updateTimes.push('Altın '+formatMarketTime(gold.time)+' · '+gold.source);
   }else{
     goldEl.textContent='Veri yok';
     updateTimes.push('Altın bağlantısı kurulamadı');
