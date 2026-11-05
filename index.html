@@ -421,12 +421,21 @@ async function cloudRefreshBackupInfo(){
    else{
     history.forEach((item,index)=>{
      const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)';
-     const p=item.payload||{},parts=[['Borç',p.debts],['Ödeme',p.payments],['Gelir',p.incomes],['Gider',p.expenses]];
+     const p=item.payload||{},debts=Array.isArray(p.debts)?p.debts:[],payments=Array.isArray(p.payments)?p.payments:[],parts=[['Ödeme',p.payments],['Gelir',p.incomes],['Gider',p.expenses]];
      const info=document.createElement('div');info.style.cssText='flex:1;min-width:0';
      const heading=document.createElement('div');heading.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;font-weight:600';
      const date=document.createElement('span');date.textContent=cloudFormatDate(item.created_at);
      const rev=document.createElement('span');rev.className='small';rev.textContent='Rev. '+item.source_revision;heading.append(date,rev);
-     const stats=document.createElement('div');stats.style.cssText='display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:5px';
+     const stats=document.createElement('div');stats.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:5px';
+     debts.forEach(debt=>{
+      const paidForDebt=payments.filter(pay=>pay.debtId===debt.id).reduce((sum,pay)=>sum+(Number(pay.amount)||0),0);
+      const remainingForDebt=Math.max(0,(Number(debt.amount)||0)-paidForDebt);
+      const cell=document.createElement('div');cell.style.cssText='min-width:0;text-align:center;padding:6px 4px;border-radius:7px;background:var(--soft,rgba(127,127,127,.08))';
+      const caption=document.createElement('span');caption.className='small';caption.style.cssText='display:block;font-size:10px;overflow-wrap:anywhere';caption.textContent=debt.name||'İsimsiz borç';
+      const number=document.createElement('b');number.style.cssText='display:block;font-size:12px;margin-top:2px;overflow-wrap:anywhere';number.textContent=cloudFullTL(remainingForDebt);
+      cell.append(caption,number);stats.appendChild(cell);
+     });
+     if(!debts.length){const emptyDebt=document.createElement('div');emptyDebt.className='small';emptyDebt.textContent='Bu yedekte borç kaydı yok.';stats.appendChild(emptyDebt);}
      parts.forEach(([label,list])=>{const cell=document.createElement('div');cell.style.cssText='min-width:0;text-align:center;padding:4px 2px;border-radius:6px;background:var(--soft,rgba(127,127,127,.08))';const number=document.createElement('b');number.style.cssText='display:block;font-size:13px';number.textContent=Array.isArray(list)?list.length:0;const caption=document.createElement('span');caption.className='small';caption.style.cssText='font-size:10px';caption.textContent=label;cell.append(number,caption);stats.appendChild(cell);});
      const amounts=cloudDebtAmounts(p);
      const meta=document.createElement('div');meta.className='small';meta.style.cssText='font-size:10px;margin-top:3px;line-height:1.45';meta.textContent='Toplam '+backupRecordCount(p)+' kayıt · Borç: '+cloudFullTL(amounts.original)+' · Ödenen: '+cloudFullTL(amounts.paid)+' · Kalan: '+cloudFullTL(amounts.remaining);
