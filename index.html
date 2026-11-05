@@ -490,26 +490,31 @@ async function cloudUpload(){
   const local=JSON.parse(JSON.stringify(data));
   cloudValidatePayload(local);
   const current=await cloudGetBackup(user.id);
+  let savedRow;
   if(current){
    if(Number(current.schema_version)!==2)throw new Error('Buluttaki yedek farklı bir şema sürümünde. Güvenli aktarım durduruldu.');
    const count=backupRecordCount(current.payload||{});
    const updated=current.updated_at?new Date(current.updated_at).toLocaleString('tr-TR'):'tarih bilinmiyor';
-   if(!confirm('Bulutta mevcut bir yedek var.\nSon güncelleme: '+updated+'\nKayıt sayısı: '+count+'\n\nBu cihazdaki '+backupRecordCount(local)+' kayıtla bulut yedeğinin üzerine yazılsın mı?'))return;
-   cloudStatus('Mevcut yedek güvenlik arşivine alınıyor…');
-   await cloudArchiveCurrentBackup(user.id,current);
-   cloudStatus('Bulut yedeği güncelleniyor…');
+   if(!confirm('Bulutta mevcut bir yedek var.\nSon güncelleme: '+updated+'\nKayıt sayısı: '+count+'\n\nBu cihazdaki '+backupRecordCount(local)+' kayıt yeni bir yedek olarak kaydedilsin mi? Önceki yedekler geçmişte korunacak.'))return;
+   cloudStatus('Yeni bulut yedeği kaydediliyor…');
    const {data:updatedRow,error}=await cloudClient.from('user_backups').update({payload:local,schema_version:2}).eq('user_id',user.id).eq('revision',current.revision).select('revision,updated_at').maybeSingle();
    if(error)throw error;
    if(!updatedRow)throw new Error('Çakışma tespit edildi: bulut yedeği başka bir cihazda değişmiş. Önce buluttaki yedeği kontrol et ve tekrar dene.');
-   const meta=document.getElementById('cloudBackupMeta');if(meta)meta.textContent='Bulut yedeği güncellendi · '+new Date(updatedRow.updated_at).toLocaleString('tr-TR')+' · '+backupRecordCount(local)+' kayıt · sürüm '+updatedRow.revision;
+   savedRow=updatedRow;
   }else{
    if(!confirm('Bu hesapta henüz bulut yedeği yok. Bu cihazdaki '+backupRecordCount(local)+' kayıt ilk bulut yedeği olarak kaydedilsin mi?'))return;
    cloudStatus('İlk bulut yedeği oluşturuluyor…');
    const {data:inserted,error}=await cloudClient.from('user_backups').insert({user_id:user.id,payload:local,schema_version:2}).select('revision,updated_at').single();
    if(error)throw error;
-   const meta=document.getElementById('cloudBackupMeta');if(meta)meta.textContent='İlk bulut yedeği oluşturuldu · '+new Date(inserted.updated_at).toLocaleString('tr-TR')+' · '+backupRecordCount(local)+' kayıt.';
+   savedRow=inserted;
   }
-  cloudStatus('Bulut yedekleme başarılı. Telefonundaki yerel kayıtlar korunuyor.');
+  const {error:historyError}=await cloudClient.from('user_backup_history').insert({user_id:user.id,payload:local,schema_version:2,source_revision:savedRow.revision});
+  if(historyError)throw new Error('Bulut yedeği güncellendi ancak yedek geçmişine eklenemedi: '+historyError.message);
+  const {data:older,error:readError}=await cloudClient.from('user_backup_history').select('id').eq('user_id',user.id).order('created_at',{ascending:false}).range(10,1000);
+  if(readError)throw readError;
+  if(older?.length){const {error:deleteError}=await cloudClient.from('user_backup_history').delete().eq('user_id',user.id).in('id',older.map(x=>x.id));if(deleteError)throw deleteError;}
+  const meta=document.getElementById('cloudBackupMeta');if(meta)meta.textContent='Bulut yedeği kaydedildi · '+new Date(savedRow.updated_at).toLocaleString('tr-TR')+' · '+backupRecordCount(local)+' kayıt · sürüm '+savedRow.revision;
+  cloudStatus('Bulut yedekleme başarılı. Yeni yedek doğrudan yedek geçmişine eklendi; telefonundaki kayıtlar korundu.');
   await cloudRefreshBackupInfo();
  }catch(error){cloudStatus(error.message||'Bulut yedeklemesi başarısız.');}
 }
