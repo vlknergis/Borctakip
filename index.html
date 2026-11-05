@@ -86,7 +86,7 @@ canvas{width:100%!important;height:100%!important}
     <div class="ticker-item"><span class="ticker-title">GRAM ALTIN</span><span class="ticker-val" id="goldRate">Yükleniyor...</span></div>
   </div>
   <div class="small" id="marketUpdated" style="margin:-5px 2px 12px">Döviz ve altın verileri alınıyor...</div>
-  <div class="small" style="margin:-6px 2px 12px">Altın: spot piyasa gram karşılığıdır; kuyumcu alış/satış fiyatı ve işçilik içermez. Döviz kaynağı: <a href="https://cxrates.com/" target="_blank" rel="noopener">CxRates</a>. Altın kaynağı: <a href="https://gold-api.com/" target="_blank" rel="noopener">Gold API</a>.</div>
+  <div class="small" style="margin:-6px 2px 12px">Altın: spot piyasa gram karşılığıdır; kuyumcu alış/satış fiyatı ve işçilik içermez. Döviz kaynağı: <a href="https://cxrates.com/" target="_blank" rel="noopener">CxRates</a>. Gram altın alış/satış: <a href="https://turkpidya.com/gold-prices/" target="_blank" rel="noopener">Turkpidya</a>; spot yedek: <a href="https://gold-api.com/" target="_blank" rel="noopener">Gold API</a>.</div>
 
   <p class="notice">Verileriniz cihazınızda saklanır (`borctakip_v2`). Eski kayıtlarınız (`borctakip_v1`) geçiş sırasında silinmez. Düzenli yedek almayı unutmayın.</p>
 </section>
@@ -503,18 +503,30 @@ async function fetchMarketRates(){
   })();
   const goldPromise=(async()=>{
     try{
-      const response=await fetch('https://api.gold-api.com/price/XAU/TRY');
-      if(!response.ok)throw new Error('Gold API yanıt vermedi');
+      const response=await fetch('https://turkpidya.com/wp-json/turkpidya-data/v1/gold?category=gram');
+      if(!response.ok)throw new Error('Yerel altın kaynağı yanıt vermedi');
       const quote=await response.json();
-      if(!Number.isFinite(Number(quote.price))||Number(quote.price)<=0)throw new Error('Altın verisi geçersiz');
-      return {gram:Number(quote.price)/31.1035,time:quote.updatedAt,source:'Gold API'};
-    }catch(primaryError){
-      const response=await fetch('https://xaus.com/api/v1/spot?currency=TRY&unit=gram&compact=1');
-      if(!response.ok)throw new Error('Altın kaynaklarına ulaşılamadı');
-      const quote=await response.json();
-      const price=Number(quote.xau?.price);
-      if(!Number.isFinite(price)||price<=0||quote.data_state?.status==='unavailable')throw new Error('Yedek altın verisi geçersiz');
-      return {gram:price,time:quote.updated_at,source:'XAUS yedek',stale:quote.data_state?.status==='stale'};
+      const item=quote.prices?.find(x=>x.type==='gram_24k');
+      const buy=Number(item?.buy),sell=Number(item?.sell);
+      const updated=quote.last_updated||quote.price_date;
+      const age=updated?Date.now()-new Date(updated).getTime():Infinity;
+      if(!Number.isFinite(buy)||!Number.isFinite(sell)||buy<=0||sell<=0||age>20*60*1000)throw new Error('Yerel altın verisi güncel değil');
+      return {buy,sell,time:updated,source:'Turkpidya / BigPara',kind:'retail'};
+    }catch(localError){
+      try{
+        const response=await fetch('https://api.gold-api.com/price/XAU/TRY');
+        if(!response.ok)throw new Error('Gold API yanıt vermedi');
+        const quote=await response.json();
+        if(!Number.isFinite(Number(quote.price))||Number(quote.price)<=0)throw new Error('Spot altın verisi geçersiz');
+        return {spot:Number(quote.price)/31.1035,time:quote.updatedAt,source:'Gold API',kind:'spot'};
+      }catch(primaryError){
+        const response=await fetch('https://xaus.com/api/v1/spot?currency=TRY&unit=gram&compact=1');
+        if(!response.ok)throw new Error('Altın kaynaklarına ulaşılamadı');
+        const quote=await response.json();
+        const price=Number(quote.xau?.price);
+        if(!Number.isFinite(price)||price<=0||quote.data_state?.status==='unavailable')throw new Error('Yedek altın verisi geçersiz');
+        return {spot:price,time:quote.updated_at,source:'XAUS yedek',kind:'spot',stale:quote.data_state?.status==='stale'};
+      }
     }
   })();
   const [fxResult,goldResult]=await Promise.allSettled([fxPromise,goldPromise]);
@@ -530,8 +542,9 @@ async function fetchMarketRates(){
   }
   if(goldResult.status==='fulfilled'){
     const gold=goldResult.value;
-    goldEl.textContent=gold.gram.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₺'+(gold.stale?' · eski':'');
-    updateTimes.push('Altın '+formatMarketTime(gold.time)+' · '+gold.source);
+    const fmt=value=>value.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₺';
+    goldEl.textContent=gold.kind==='retail'?'A '+fmt(gold.buy)+' / S '+fmt(gold.sell):'Spot '+fmt(gold.spot)+(gold.stale?' · eski':'');
+    updateTimes.push('Altın '+formatMarketTime(gold.time)+' · '+gold.source+(gold.kind==='spot'?' (spot; kuyumcu fiyatı değil)':''));
   }else{
     goldEl.textContent='Veri yok';
     updateTimes.push('Altın bağlantısı kurulamadı');
