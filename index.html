@@ -243,11 +243,11 @@ canvas{width:100%!important;height:100%!important}
   </div>
   <div class="card" id="cloudAccountCard">
     <b>Bulut Hesabı</b>
-    <p class="small">E-posta ile hesap oluştur veya giriş yap. Bu aşamada yalnızca oturum açma etkin; borç kayıtları buluta aktarılmaz. Bulut yedekleme, veritabanı tabloları ve güvenlik kuralları kurulduktan sonra açılacaktır.</p>
+    <p class="small">Hesabına giriş yaptıktan sonra cihazındaki kayıtları elle buluta yedekleyebilir veya buluttaki yedeği bu cihaza geri yükleyebilirsin. Otomatik eşitleme kapalıdır; hiçbir kayıt iznin olmadan üzerine yazılmaz.</p>
     <div class="field"><label for="cloudEmail">E-posta</label><input id="cloudEmail" type="email" autocomplete="email" placeholder="ornek@mail.com"></div>
     <div class="field"><label for="cloudPassword">Şifre</label><input id="cloudPassword" type="password" autocomplete="current-password" minlength="8" placeholder="En az 8 karakter"></div>
     <div class="row" style="gap:8px;flex-wrap:wrap"><button class="primary" type="button" onclick="cloudSignUp()">Hesap Oluştur</button><button class="ghost" type="button" onclick="cloudSignIn()">Giriş Yap</button><button class="ghost" type="button" onclick="cloudSignOut()">Çıkış Yap</button></div>
-    <div class="small" id="cloudAuthStatus" style="margin-top:10px">Bulut bağlantısı hazırlanıyor…</div>
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:12px"><button class="primary" type="button" onclick="cloudUpload()">Cihaza ait verileri buluta yedekle</button><button class="ghost" type="button" onclick="cloudDownload()">Bulut yedeğini bu cihaza yükle</button></div><div class="small" id="cloudAuthStatus" style="margin-top:10px">Bulut bağlantısı hazırlanıyor…</div><div class="small" id="cloudBackupMeta" style="margin-top:6px">Bulut yedeği henüz kontrol edilmedi.</div>
   </div>
   <div class="card">
     <b>Yedekleme Merkezi</b>
@@ -334,7 +334,103 @@ function cloudCredentials(){const email=(document.getElementById('cloudEmail')?.
 async function cloudSignUp(){try{if(!cloudClient)throw new Error('Bulut istemcisi yüklenemedi. İnternet bağlantısını kontrol et.');const {email,password}=cloudCredentials();cloudStatus('Hesap oluşturuluyor…');const {data,error}=await cloudClient.auth.signUp({email,password});if(error)throw error;cloudStatus(data.session?'Hesap oluşturuldu ve giriş yapıldı.':'Kayıt isteği alındı. E-postana gelen doğrulama bağlantısını kontrol et.');}catch(error){cloudStatus(error.message||'Hesap oluşturulamadı.');}}
 async function cloudSignIn(){try{if(!cloudClient)throw new Error('Bulut istemcisi yüklenemedi. İnternet bağlantısını kontrol et.');const {email,password}=cloudCredentials();cloudStatus('Giriş yapılıyor…');const {data,error}=await cloudClient.auth.signInWithPassword({email,password});if(error)throw error;cloudStatus('Giriş yapıldı: '+(data.user?.email||email)+'. Bulut yedekleme henüz etkin değil.');}catch(error){cloudStatus(error.message||'Giriş yapılamadı.');}}
 async function cloudSignOut(){if(!cloudClient){cloudStatus('Bulut bağlantısı hazır değil.');return;}const {error}=await cloudClient.auth.signOut();cloudStatus(error?'Çıkış yapılamadı: '+error.message:'Hesaptan çıkış yapıldı. Cihazdaki yerel kayıtların korunuyor.');}
-async function initCloudAuth(){if(!cloudClient){cloudStatus('Bulut istemcisi yüklenemedi.');return;}const {data,error}=await cloudClient.auth.getSession();if(error){cloudStatus('Oturum kontrol edilemedi: '+error.message);return;}cloudStatus(data.session?'Oturum açık: '+(data.session.user.email||'hesap')+'. Bulut yedekleme henüz etkin değil.':'Henüz giriş yapılmadı. Yerel kayıtların bu cihazda kalır.');cloudClient.auth.onAuthStateChange((_event,session)=>{cloudStatus(session?'Oturum açık: '+(session.user.email||'hesap')+'. Bulut yedekleme henüz etkin değil.':'Oturum kapalı. Yerel kayıtların bu cihazda kalır.');});}
+let cloudAuthListenerReady=false;
+async function cloudCurrentUser(){
+ if(!cloudClient)throw new Error('Bulut istemcisi yüklenemedi. İnternet bağlantısını kontrol et.');
+ const {data,error}=await cloudClient.auth.getUser();
+ if(error)throw error;
+ if(!data.user)throw new Error('Önce bulut hesabına giriş yap.');
+ return data.user;
+}
+function cloudValidatePayload(payload){
+ if(!payload||typeof payload!=='object'||Array.isArray(payload))throw new Error('Bulut yedeğinin veri yapısı geçersiz.');
+ const lists=['debts','payments','expenses','expensePayments','incomes','spendings'];
+ if(!Array.isArray(payload.debts)||!Array.isArray(payload.payments))throw new Error('Bulut yedeğinde zorunlu borç/ödeme listeleri bulunamadı.');
+ for(const key of lists){
+  if(payload[key]!==undefined&&(!Array.isArray(payload[key])||!payload[key].every(item=>item&&typeof item==='object'&&!Array.isArray(item))))throw new Error(key+' listesi geçersiz.');
+ }
+ for(const key of lists)(payload[key]||[]).forEach(item=>{
+  if(item.amount!==undefined&&(!Number.isFinite(Number(item.amount))||Number(item.amount)<0))throw new Error('Yedekte geçersiz tutar bulundu.');
+ });
+ if(payload.income!==undefined&&!Number.isFinite(Number(payload.income)))throw new Error('Gelir bilgisi geçersiz.');
+ if(payload.monthlySavingsGoal!==undefined&&!Number.isFinite(Number(payload.monthlySavingsGoal)))throw new Error('Birikim hedefi geçersiz.');
+ return true;
+}
+async function cloudGetBackup(userId){
+ const {data,error}=await cloudClient.from('user_backups').select('payload,schema_version,revision,updated_at').eq('user_id',userId).maybeSingle();
+ if(error)throw error;
+ return data;
+}
+function cloudSaveLocalSafetyCopy(){
+ const oldData=JSON.parse(JSON.stringify(data));
+ const payload={app:'Borctakip',version:2,exportedAt:new Date().toISOString(),recordCount:backupRecordCount(oldData),data:oldData};
+ try{localStorage.setItem('borctakip_pre_cloud_backup',JSON.stringify(payload));}
+ catch(error){throw new Error('Bulut işlemi öncesi güvenlik kopyası telefona kaydedilemedi. Yer aç; mevcut veriler korunuyor.');}
+ return oldData;
+}
+async function cloudUpload(){
+ try{
+  const user=await cloudCurrentUser();
+  const local=JSON.parse(JSON.stringify(data));
+  cloudValidatePayload(local);
+  const current=await cloudGetBackup(user.id);
+  if(current){
+   if(Number(current.schema_version)!==2)throw new Error('Buluttaki yedek farklı bir şema sürümünde. Güvenli aktarım durduruldu.');
+   const count=backupRecordCount(current.payload||{});
+   const updated=current.updated_at?new Date(current.updated_at).toLocaleString('tr-TR'):'tarih bilinmiyor';
+   if(!confirm('Bulutta mevcut bir yedek var.\nSon güncelleme: '+updated+'\nKayıt sayısı: '+count+'\n\nBu cihazdaki '+backupRecordCount(local)+' kayıtla bulut yedeğinin üzerine yazılsın mı?'))return;
+   cloudStatus('Bulut yedeği güncelleniyor…');
+   const {data:updatedRow,error}=await cloudClient.from('user_backups').update({payload:local,schema_version:2}).eq('user_id',user.id).eq('revision',current.revision).select('revision,updated_at').maybeSingle();
+   if(error)throw error;
+   if(!updatedRow)throw new Error('Çakışma tespit edildi: bulut yedeği başka bir cihazda değişmiş. Önce buluttaki yedeği kontrol et ve tekrar dene.');
+   const meta=document.getElementById('cloudBackupMeta');if(meta)meta.textContent='Bulut yedeği güncellendi · '+new Date(updatedRow.updated_at).toLocaleString('tr-TR')+' · '+backupRecordCount(local)+' kayıt · sürüm '+updatedRow.revision;
+  }else{
+   if(!confirm('Bu hesapta henüz bulut yedeği yok. Bu cihazdaki '+backupRecordCount(local)+' kayıt ilk bulut yedeği olarak kaydedilsin mi?'))return;
+   cloudStatus('İlk bulut yedeği oluşturuluyor…');
+   const {data:inserted,error}=await cloudClient.from('user_backups').insert({user_id:user.id,payload:local,schema_version:2}).select('revision,updated_at').single();
+   if(error)throw error;
+   const meta=document.getElementById('cloudBackupMeta');if(meta)meta.textContent='İlk bulut yedeği oluşturuldu · '+new Date(inserted.updated_at).toLocaleString('tr-TR')+' · '+backupRecordCount(local)+' kayıt.';
+  }
+  cloudStatus('Bulut yedekleme başarılı. Telefonundaki yerel kayıtlar korunuyor.');
+ }catch(error){cloudStatus(error.message||'Bulut yedeklemesi başarısız.');}
+}
+async function cloudDownload(){
+ try{
+  const user=await cloudCurrentUser();
+  cloudStatus('Bulut yedeği kontrol ediliyor…');
+  const remote=await cloudGetBackup(user.id);
+  if(!remote){cloudStatus('Bu hesapta henüz bulut yedeği yok. Önce cihazdan buluta yedekleme yap.');return;}
+  if(Number(remote.schema_version)!==2)throw new Error('Bulut yedeği bu uygulama sürümüyle uyumlu değil.');
+  cloudValidatePayload(remote.payload);
+  const count=backupRecordCount(remote.payload);
+  const updated=remote.updated_at?new Date(remote.updated_at).toLocaleString('tr-TR'):'tarih bilinmiyor';
+  if(!confirm('Bulut yedeği bulundu.\nSon güncelleme: '+updated+'\nKayıt sayısı: '+count+'\n\nBu işlem bu cihazdaki mevcut kayıtların yerine bulut yedeğini yükler. Devam edilsin mi?'))return;
+  const oldData=cloudSaveLocalSafetyCopy();
+  const restored={...remote.payload};
+  ['debts','payments','expenses','expensePayments','incomes','spendings'].forEach(key=>{if(!Array.isArray(restored[key]))restored[key]=[];});
+  if(!Number.isFinite(Number(restored.income)))restored.income=0;
+  if(typeof restored.phone!=='string')restored.phone='';
+  if(!Number.isFinite(Number(restored.monthlySavingsGoal)))restored.monthlySavingsGoal=0;
+  data=restored;
+  if(!save()){data=oldData;throw new Error('Cihaza kaydedilemedi. Eski kayıtlar bellekte korundu.');}
+  cloudStatus('Bulut yedeği bu cihaza yüklendi. Önceki cihaz verilerinin güvenlik kopyası saklandı.');
+  const meta=document.getElementById('cloudBackupMeta');if(meta)meta.textContent='Yüklenen bulut yedeği · '+updated+' · '+count+' kayıt · sürüm '+remote.revision;
+  alert('Bulut yedeği yüklendi. Önceki cihaz verilerinin güvenlik kopyası da saklandı.');
+ }catch(error){cloudStatus(error.message||'Bulut yedeği yüklenemedi.');}
+}
+async function initCloudAuth(){
+ if(!cloudClient){cloudStatus('Bulut istemcisi yüklenemedi.');return;}
+ const {data,error}=await cloudClient.auth.getSession();
+ if(error){cloudStatus('Oturum kontrol edilemedi: '+error.message);return;}
+ const session=data.session;
+ cloudStatus(session?'Oturum açık: '+(session.user.email||'hesap')+'. Bulut yedekleme hazır.':'Henüz giriş yapılmadı. Yerel kayıtların bu cihazda kalır.');
+ if(!cloudAuthListenerReady){
+  cloudAuthListenerReady=true;
+  cloudClient.auth.onAuthStateChange((_event,nextSession)=>{
+   cloudStatus(nextSession?'Oturum açık: '+(nextSession.user.email||'hesap')+'. Bulut yedekleme hazır.':'Oturum kapalı. Yerel kayıtların bu cihazda kalır.');
+  });
+ }
+}
 </script>
 <script>
 const LEGACY_KEY='borctakip_v1';
@@ -1320,6 +1416,7 @@ async function checkReminders(){
 
 document.getElementById('calMonth').value=today().slice(0,7);
 render();
+initCloudAuth();
 fetchMarketRates();
 setInterval(fetchMarketRates,60000);
 calculateLoan();
