@@ -13,7 +13,7 @@
 header{background:linear-gradient(135deg,#101827,#20385f);color:white;padding:25px 18px 28px;border-radius:0 0 25px 25px}
 .connection-status{max-width:760px;margin:0 auto;padding:8px 14px 0;font-size:11px;color:var(--muted)}.connection-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:20px;background:#e8f7ef;color:#137a50;font-weight:700}.connection-pill.offline{background:#fff1df;color:#9a5b08}.connection-detail{margin-left:7px}
 .top{display:flex;justify-content:space-between;align-items:center}.brand{font-weight:800;font-size:20px;letter-spacing:.2px}.tag{font-size:11px;color:#c8d5ed;background:#ffffff18;padding:6px 10px;border-radius:20px}
-.total-label{color:#c3cee0;font-size:13px;margin-top:20px}.total{font-size:32px;font-weight:800;letter-spacing:-1px;margin:3px 0}.sub{font-size:12px;color:#c3cee0}
+.total-label{color:#c3cee0;font-size:13px;margin-top:20px}.total{font-size:clamp(20px,5vw,32px);font-weight:800;letter-spacing:-1px;margin:3px 0}.sub{font-size:12px;color:#c3cee0}.header-totals{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:17px}.header-metric{min-width:0}.header-metric .total-label{margin-top:0}.header-metric .total{white-space:nowrap}.header-expense .total{color:#ffb8bd}
 main{max-width:760px;margin:auto;padding:16px 14px 130px}.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:-2px}
 @media(min-width:500px){.stats{grid-template-columns:1fr 1fr 1fr 1fr}}
 .card{background:var(--card);border:1px solid var(--line);border-radius:17px;padding:15px;box-shadow:0 5px 18px #1c31500a;margin-bottom:12px}
@@ -44,9 +44,18 @@ canvas{width:100%!important;height:100%!important}
 <body>
 <header>
   <div class="top"><div class="brand">◈ Borç Takip VabsPro</div><div class="tag">KİŞİSEL FİNANS</div></div>
-  <div class="total-label">Toplam Kalan Borç</div>
-  <div class="total" id="total">₺0,00</div>
-  <div class="sub" id="debtCount">Yükleniyor...</div>
+  <div class="header-totals">
+    <div class="header-metric">
+      <div class="total-label">Toplam Kalan Borç</div>
+      <div class="total" id="total">₺0,00</div>
+      <div class="sub" id="debtCount">Yükleniyor...</div>
+    </div>
+    <div class="header-metric header-expense">
+      <div class="total-label">Toplam Aylık Gider</div>
+      <div class="total" id="headerMonthlyExpense">₺0,00</div>
+      <div class="sub">Sabit + günlük harcamalar</div>
+    </div>
+  </div>
 </header>
 <div class="connection-status"><span id="connectionPill" class="connection-pill"><span id="connectionDot">●</span><span id="connectionLabel">Bağlantı kontrol ediliyor</span></span><span id="connectionDetail" class="connection-detail">Kayıtlar bu cihazda saklanır.</span></div>
 <main>
@@ -1298,6 +1307,8 @@ function render(){
   if(homeFixedExpenseEl)homeFixedExpenseEl.textContent=money(fixedTotal);
   if(homeDailyExpenseEl)homeDailyExpenseEl.textContent=money(homeDailyExpense);
   if(homeTotalExpenseEl)homeTotalExpenseEl.textContent=money(fixedTotal+homeDailyExpense);
+  const headerMonthlyExpenseEl=document.getElementById('headerMonthlyExpense');
+  if(headerMonthlyExpenseEl)headerMonthlyExpenseEl.textContent=money(fixedTotal+homeDailyExpense);
 
   let net = (Number(data.income)||0) + monthlyIncome(month) - (paid + fixedTotal + monthlySpending(month));
   let netEl = document.getElementById('netBudget');
