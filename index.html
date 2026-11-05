@@ -817,8 +817,38 @@ function renderPlan(){
   ${warning?'<p class="small red">⚠️ '+esc(warning)+'</p>':''}
   <p class="small">Hesap; girilen aylık faiz oranının sabit kaldığını, her ay ödeme öncesi uygulandığını ve ek masraf/vergi olmadığını varsayar. Bankanın kesin ödeme planı değildir.</p>
   ${lines.join('')}
+  ${renderPlanComparison(budget)}
   ${month>24?'<p class="small">İlk 24 ay gösteriliyor.</p>':''}
  `;
+}
+
+
+function simulatePlanScenario(budget,strategy){
+ const debts=data.debts.map(d=>({remain:remaining(d),rate:Math.max(0,Number(d.rate)||0),minPay:Math.max(0,Number(d.installment)||0)})).filter(d=>d.remain>0.005);
+ const minimum=debts.reduce((s,d)=>s+Math.min(d.remain,d.minPay),0);
+ if(!debts.length)return {months:0,interest:0,minimum};
+ if(budget+0.005<minimum)return {months:null,interest:null,minimum};
+ const priority=(a,b)=>strategy==='rate'?(b.rate-a.rate||a.remain-b.remain):(a.remain-b.remain||b.rate-a.rate);
+ let month=0,totalInterest=0;
+ while(debts.some(d=>d.remain>0.005)&&month<600){
+  month++;
+  let cash=budget;
+  for(const d of debts){if(d.remain<=0.005)continue;const interest=d.remain*d.rate/100;d.remain+=interest;totalInterest+=interest;}
+  for(const d of debts){if(d.remain<=0.005||d.minPay<=0)continue;const payment=Math.min(cash,d.remain,d.minPay);d.remain-=payment;cash-=payment;}
+  for(const d of debts.slice().sort(priority)){if(cash<=0.005)break;if(d.remain<=0.005)continue;const payment=Math.min(cash,d.remain);d.remain-=payment;cash-=payment;}
+ }
+ return {months:debts.some(d=>d.remain>0.005)?null:month,interest:totalInterest,minimum};
+}
+function renderPlanComparison(budget){
+ const budgets=[budget,Math.round(budget*1.1/100)*100,Math.round(budget*1.2/100)*100];
+ const rows=budgets.map((amount,index)=>{
+  const snow=simulatePlanScenario(amount,'small');
+  const avalanche=simulatePlanScenario(amount,'rate');
+  const duration=result=>result.months===null?'Yetersiz / 600+ ay':result.months+' ay';
+  const interest=result=>result.interest===null?'—':money(result.interest);
+  return '<tr><td>'+ (index===0?'Mevcut':index===1?'+%10':'+%20')+'<br><b>'+money(amount)+'</b></td><td>'+duration(snow)+'<br><span class="small">'+interest(snow)+' faiz</span></td><td>'+duration(avalanche)+'<br><span class="small">'+interest(avalanche)+' faiz</span></td></tr>';
+ }).join('');
+ return '<div class="card" style="margin-top:12px"><b>Ödeme bütçesi ve strateji karşılaştırması</b><p class="small">Aynı borçlar için kartopu ve çığ yöntemlerini karşılaştırır. +%10 ve +%20 senaryoları örnektir.</p><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="text-align:left;padding:7px">Aylık bütçe</th><th style="text-align:left;padding:7px">Kartopu</th><th style="text-align:left;padding:7px">Çığ</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
 }
 
 /* GRAFİK ÇİZİMİ */
