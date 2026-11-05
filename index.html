@@ -96,9 +96,14 @@ canvas{width:100%!important;height:100%!important}
 </section>
 
 <section id="expenses" class="view">
-  <div class="section"><h2>Kira & Fatura / Sabit Giderler</h2><button class="primary" onclick="openExpense()">＋ Gider Ekle</button></div>
+  <div class="section"><h2>Harcama Yönetimi</h2><button class="primary" onclick="openExpense()">＋ Sabit Gider Ekle</button></div>
   <div class="card"><div class="small">Aylık düzenli kira, fatura ve abonelik giderleriniz. Belirttiğiniz günlerde saat 10:00, 14:00 ve 19:00'da hatırlatılır.</div></div>
   <div class="list" id="expenseList"></div>
+  <div class="section"><h2>Günlük Harcamalar</h2><button class="primary" onclick="openSpending()">＋ Harcama Ekle</button></div>
+  <div class="card"><div class="row"><span>Bu ay harcanan</span><b id="spendingMonthTotal" class="red">₺0,00</b></div><div class="small">Market, ulaşım, yemek ve diğer tek seferlik harcamalar.</div></div>
+  <div class="list" id="spendingList"></div>
+  <div class="section"><h2>Aylık Bütçe Özeti</h2></div>
+  <div class="card"><div class="row"><span>Gelir (düzenli + kayıtlı)</span><b id="reportIncome" class="green">₺0,00</b></div><div class="row"><span>Sabit giderler</span><b id="reportFixed" class="purple">₺0,00</b></div><div class="row"><span>Günlük harcamalar</span><b id="reportSpending" class="red">₺0,00</b></div><div class="row"><span>Borç ödemeleri</span><b id="reportDebt" class="red">₺0,00</b></div><hr><div class="row"><b>Ay sonu kalan</b><b id="reportBalance">₺0,00</b></div></div>
 </section>
 
 <section id="calc" class="view">
@@ -244,6 +249,7 @@ canvas{width:100%!important;height:100%!important}
 </form></div></div>
 
 <!-- Sabit Gider / Fatura Ekle Modal -->
+<div class="modal" id="spendingModal"><div class="sheet"><div class="row"><h3 id="spendingModalTitle">Harcama Ekle</h3><button class="secondary" type="button" onclick="closeSpending()">Kapat</button></div><form id="spendingForm" onsubmit="saveSpending(event)"><input type="hidden" id="spendingEditId"><div class="field"><label>Harcama açıklaması</label><input id="spendingName" required placeholder="Örn. Market, yakıt, yemek"></div><div class="field"><label>Kategori</label><select id="spendingCategory"><option>Market</option><option>Ulaşım / Yakıt</option><option>Yemek</option><option>Sağlık</option><option>Giyim</option><option>Çocuk</option><option>Ev</option><option>Eğlence</option><option>Diğer</option></select></div><div class="field"><label>Tutar (₺)</label><input id="spendingAmount" type="number" min="0.01" step="0.01" required></div><div class="field"><label>Harcama tarihi</label><input id="spendingDate" type="date" required></div><div class="field"><label>Not (isteğe bağlı)</label><input id="spendingNote" placeholder="Açıklama"></div><div class="actions"><button type="button" class="secondary" onclick="closeSpending()">Vazgeç</button><button class="primary" type="submit">Harcamayı Kaydet</button></div></form></div></div>
 <div class="modal" id="expenseModal"><div class="sheet"><div class="row"><h3 id="expModalTitle">Yeni Gider / Fatura Ekle</h3><button class="secondary" onclick="closeExpModal()">Kapat</button></div>
 <form id="expForm" onsubmit="saveExpense(event)">
 <input type="hidden" id="expEditId">
@@ -265,7 +271,7 @@ canvas{width:100%!important;height:100%!important}
 <script>
 const LEGACY_KEY='borctakip_v1';
 const KEY='borctakip_v2';
-const EMPTY_DATA={debts:[],payments:[],expenses:[],income:0,phone:''};
+const EMPTY_DATA={debts:[],payments:[],expenses:[],incomes:[],spendings:[],income:0,phone:''};
 
 function readStoredData(key){
   try {
@@ -288,6 +294,7 @@ if(!Array.isArray(data.debts)) data.debts=[];
 if(!Array.isArray(data.payments)) data.payments=[];
 if(!Array.isArray(data.expenses)) data.expenses=[];
 if(!Array.isArray(data.incomes)) data.incomes=[];
+if(!Array.isArray(data.spendings)) data.spendings=[];
 if(!Number.isFinite(Number(data.income))) data.income=0;
 if(!data.phone) data.phone='';
 if(!currentData && legacyData){
@@ -365,6 +372,65 @@ function renderIncomes(){
       <div class="row"><div><b>${esc(x.name)}</b> <span class="badge badge-fixed">${esc(x.category)}</span><div class="small">${esc(x.date||'Tarih yok')}${x.note?' · '+esc(x.note):''}</div></div><div class="amount green">+${money(x.amount)}</div></div>
       <div class="row" style="margin-top:10px"><span class="small">${x.date&&x.date.slice(0,7)===month?'Bu ay':'Geçmiş / gelecek kayıt'}</span><div style="display:flex;gap:6px"><button class="ghost" onclick="editIncome('${x.id}')">Düzenle</button><button class="danger" onclick="deleteIncome('${x.id}')">Sil</button></div></div>
     </div>`).join(''):'<div class="card empty">Henüz gelir kaydı yok. “Gelir Ekle” ile maaş, kira veya ek gelirlerini kaydedebilirsin.</div>';
+}
+
+
+/* TEK SEFERLİK HARCAMA KAYITLARI */
+function openSpending(){
+  document.getElementById('spendingForm').reset();
+  document.getElementById('spendingEditId').value='';
+  document.getElementById('spendingDate').value=today();
+  document.getElementById('spendingModalTitle').textContent='Harcama Ekle';
+  document.getElementById('spendingModal').classList.add('show');
+}
+function closeSpending(){document.getElementById('spendingModal').classList.remove('show')}
+function saveSpending(e){
+  e.preventDefault();
+  const id=document.getElementById('spendingEditId').value;
+  const amount=Number(document.getElementById('spendingAmount').value);
+  const date=document.getElementById('spendingDate').value;
+  if(!Number.isFinite(amount)||amount<=0||!date){alert('Geçerli tutar ve tarih girin.');return}
+  const item={id:id||crypto.randomUUID(),name:document.getElementById('spendingName').value.trim(),category:document.getElementById('spendingCategory').value,amount,date,note:document.getElementById('spendingNote').value.trim()};
+  if(id)data.spendings=data.spendings.map(x=>x.id===id?item:x);else data.spendings.push(item);
+  closeSpending();save();
+}
+function editSpending(id){
+  const x=data.spendings.find(i=>i.id===id);if(!x)return;
+  document.getElementById('spendingEditId').value=id;
+  document.getElementById('spendingName').value=x.name;
+  document.getElementById('spendingCategory').value=x.category;
+  document.getElementById('spendingAmount').value=x.amount;
+  document.getElementById('spendingDate').value=x.date||today();
+  document.getElementById('spendingNote').value=x.note||'';
+  document.getElementById('spendingModalTitle').textContent='Harcamayı Düzenle';
+  document.getElementById('spendingModal').classList.add('show');
+}
+function deleteSpending(id){
+  if(!confirm('Bu harcama kaydını silmek istiyor musunuz?'))return;
+  data.spendings=data.spendings.filter(x=>x.id!==id);save();
+}
+function monthlySpending(month=today().slice(0,7)){
+  return data.spendings.filter(x=>x.date&&x.date.slice(0,7)===month).reduce((sum,x)=>sum+(Number(x.amount)||0),0);
+}
+function renderSpendings(){
+  const month=today().slice(0,7);
+  document.getElementById('spendingMonthTotal').textContent=money(monthlySpending(month));
+  const list=document.getElementById('spendingList');
+  const items=[...data.spendings].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  list.innerHTML=items.length?items.map(x=>`
+    <div class="card"><div class="row"><div><b>${esc(x.name)}</b> <span class="badge badge-fixed">${esc(x.category)}</span><div class="small">${esc(x.date||'Tarih yok')}${x.note?' · '+esc(x.note):''}</div></div><div class="amount red">−${money(x.amount)}</div></div>
+    <div class="row" style="margin-top:10px"><span class="small">${x.date&&x.date.slice(0,7)===month?'Bu ay':'Diğer ay'}</span><div style="display:flex;gap:6px"><button class="ghost" onclick="editSpending('${x.id}')">Düzenle</button><button class="danger" onclick="deleteSpending('${x.id}')">Sil</button></div></div></div>`).join(''):'<div class="card empty">Henüz günlük harcama kaydı yok.</div>';
+  const income=(Number(data.income)||0)+monthlyIncome(month);
+  const fixed=data.expenses.reduce((sum,x)=>sum+(Number(x.amount)||0),0);
+  const spending=monthlySpending(month);
+  const debt=data.payments.filter(x=>x.date&&x.date.slice(0,7)===month).reduce((sum,x)=>sum+(Number(x.amount)||0),0);
+  const balance=income-fixed-spending-debt;
+  document.getElementById('reportIncome').textContent=money(income);
+  document.getElementById('reportFixed').textContent=money(fixed);
+  document.getElementById('reportSpending').textContent=money(spending);
+  document.getElementById('reportDebt').textContent=money(debt);
+  const balanceEl=document.getElementById('reportBalance');
+  balanceEl.textContent=money(balance);balanceEl.style.color=balance>=0?'#059669':'#dc2626';
 }
 
 function saveIncome(){
@@ -753,6 +819,7 @@ function render(){
   
   renderIncomes();
   renderExpenses();
+  renderSpendings();
   renderCalendar(); 
   renderPlan();
   renderSuggestions();
@@ -858,6 +925,7 @@ function restore(e){
       if(confirm('Mevcut kayıtların yedek dosyasındaki kayıtlarla değiştirilsin mi?')){
         if(!Array.isArray(x.expenses))x.expenses=[];
         if(!Array.isArray(x.incomes))x.incomes=[];
+        if(!Array.isArray(x.spendings))x.spendings=[];
         if(!Array.isArray(x.debts))x.debts=[];
         if(!Array.isArray(x.payments))x.payments=[];
         if(!Number.isFinite(Number(x.income)))x.income=0;
@@ -871,7 +939,7 @@ function restore(e){
 
 function clearAll(){
   if(confirm('Tüm borç, ödeme ve gider kayıtları kalıcı olarak silinsin mi?')){
-    data={debts:[],payments:[],expenses:[],incomes:[],income:0,phone:''};
+    data={debts:[],payments:[],expenses:[],incomes:[],spendings:[],income:0,phone:''};
     save();
   }
 }
