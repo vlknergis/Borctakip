@@ -527,8 +527,9 @@ function renderPlan(){
    return;
  }
 
+ const initialDebtTotal=debts.reduce((sum,d)=>sum+d.remain,0);
  let left=debts.map(d=>({...d}));
- let month=0, totalInterest=0, lines=[], warning='';
+ let month=0, totalInterest=0, lines=[], warning='', negativeAmortization=false;
  const MAX_MONTHS=600;
 
  while(left.some(d=>d.remain>0.005)&&month<MAX_MONTHS){
@@ -539,6 +540,7 @@ function renderPlan(){
    for(const d of left){
      if(d.remain<=0.005)continue;
      const interest=d.remain*(d.rate/100);
+     if(d.minPay>0&&d.minPay<interest-0.005) negativeAmortization=true;
      d.remain+=interest;
      totalInterest+=interest;
    }
@@ -568,7 +570,7 @@ function renderPlan(){
    }
 
    // Asgari ödeme faizi dahi karşılamıyorsa borç büyüyebilir; bunu açıkça bildir.
-   if(left.some(d=>d.remain>0.005&&d.minPay>0&&d.minPay<d.remain*(d.rate/100)-0.005)){
+   if(negativeAmortization){
      warning='Bazı borçlarda kayıtlı taksit, aylık faiz tutarını karşılamıyor. Gerçek borç artışı ve banka asgari ödeme kuralları farklı olabilir.';
    }
  }
@@ -579,7 +581,7 @@ function renderPlan(){
 
  el.innerHTML=`
   <p><b>Tahmini borçsuz kalma süresi: ${month>=MAX_MONTHS?'600+':month+' ay'}</b></p>
-  <p>Başlangıç borcu: <b>${money(debts.reduce((sum,d)=>sum+remaining(data.debts.find(x=>x.name===d.name)||{amount:0,id:'',payments:[]}),0))}</b></p>
+  <p>Başlangıç borcu: <b>${money(initialDebtTotal)}</b></p>
   <p class="small">Simülasyondaki toplam faiz: <b class="red">${money(totalInterest)}</b></p>
   <p class="small">Aylık asgari/taksit toplamı: <b>${money(requiredMinimum)}</b></p>
   ${warning?'<p class="small red">⚠️ '+esc(warning)+'</p>':''}
