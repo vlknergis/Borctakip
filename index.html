@@ -1070,7 +1070,11 @@ function renderPlan(){
  })).filter(d=>d.remain>0.005);
 
  if(!debts.length){el.textContent='Aktif borç bulunmuyor.';return}
- if(budget<=0){el.textContent='Planı hesaplamak için aylık ödeme bütçesini girin.';return}
+ const zeroRateNames=debts.filter(d=>d.rate<=0).map(d=>d.name);
+ const zeroRateNote=zeroRateNames.length
+  ? '<p class="small" style="color:#b45309">ℹ️ '+zeroRateNames.map(name=>esc(name)).join(', ')+' için aylık faiz oranı boş veya %0. Hesaplamada bu borçlara faiz eklenmez; gerçek oranı biliyorsan borcu düzenleyip gir.</p>'
+  : '';
+ if(budget<=0){el.innerHTML='Planı hesaplamak için aylık ödeme bütçesini girin.'+zeroRateNote;return}
 
  const priority=(a,b)=>strategy==='rate'
    ? (b.rate-a.rate || a.remain-b.remain)
@@ -1084,6 +1088,7 @@ function renderPlan(){
     <p>Girilen bütçe: <b>${money(budget)}</b></p>
     <p>Kaydedilen aylık taksit/asgari toplamı: <b>${money(requiredMinimum)}</b></p>
     <p class="small">Aylık bütçeyi en az ${money(requiredMinimum)} seviyesine çıkarın veya borçların taksit/asgari tutarlarını kontrol edin. Bu durumda güvenilir borçsuz kalma süresi hesaplanamaz.</p>
+    ${zeroRateNote}
    `;
    return;
  }
@@ -1150,6 +1155,7 @@ function renderPlan(){
    <div class="row"><span>Tahmini toplam faiz</span><b class="red">${money(totalInterest)}</b></div>
   </div>
   <p class="small">Aylık asgari/taksit toplamı: <b>${money(requiredMinimum)}</b></p>
+  ${zeroRateNote}
   ${warning?'<p class="small red">⚠️ '+esc(warning)+'</p>':''}
   <p class="small">Hesap; girilen aylık faiz oranının sabit kaldığını, her ay ödeme öncesi uygulandığını ve ek masraf/vergi olmadığını varsayar. Bankanın kesin ödeme planı değildir.</p>
   ${lines.join('')}
