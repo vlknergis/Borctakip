@@ -290,7 +290,7 @@ canvas{width:100%!important;height:100%!important}
 <script>
 const LEGACY_KEY='borctakip_v1';
 const KEY='borctakip_v2';
-const EMPTY_DATA={debts:[],payments:[],expenses:[],incomes:[],spendings:[],income:0,phone:''};
+const EMPTY_DATA={debts:[],payments:[],expenses:[],expensePayments:[],incomes:[],spendings:[],income:0,phone:''};
 
 function readStoredData(key){
   try {
@@ -312,6 +312,7 @@ let data=currentData||legacyData||{...EMPTY_DATA};
 if(!Array.isArray(data.debts)) data.debts=[];
 if(!Array.isArray(data.payments)) data.payments=[];
 if(!Array.isArray(data.expenses)) data.expenses=[];
+if(!Array.isArray(data.expensePayments)) data.expensePayments=[];
 if(!Array.isArray(data.incomes)) data.incomes=[];
 if(!Array.isArray(data.spendings)) data.spendings=[];
 if(!Number.isFinite(Number(data.income))) data.income=0;
@@ -704,26 +705,33 @@ function renderExpenses(){
 }
 
 /* TAKVİM VE PLANLAMA */
+function expensePaid(expenseId,month){return data.expensePayments.some(p=>p.expenseId===expenseId&&p.month===month)}
+function toggleExpensePaid(expenseId,month){
+ const existing=data.expensePayments.find(p=>p.expenseId===expenseId&&p.month===month);
+ if(existing){if(!confirm('Bu faturanın ödendi işareti kaldırılsın mı?'))return;data.expensePayments=data.expensePayments.filter(p=>p!==existing);}
+ else {const expense=data.expenses.find(e=>e.id===expenseId);if(!expense)return;data.expensePayments.push({id:crypto.randomUUID(),expenseId,month,amount:Number(expense.amount)||0,paidAt:today()});}
+ save();
+}
 function monthlyExpenseDate(month,day){
  const parts=month.split('-').map(Number),year=parts[0],monthNo=parts[1];
  const lastDay=new Date(year,monthNo,0).getDate();
  return month+'-'+String(Math.min(Math.max(1,Number(day)||1),lastDay)).padStart(2,'0');
 }
 function calendarEvents(month){
- const debts=data.debts.filter(d=>d.due&&d.due.slice(0,7)===month&&remaining(d)>0).map(d=>({date:d.due,name:d.name,type:d.type,amt:Math.min(remaining(d),d.installment||remaining(d)),isDebt:true}));
- const exps=data.expenses.map(e=>({date:monthlyExpenseDate(month,e.day),name:e.name,type:e.category,amt:Number(e.amount)||0,isDebt:false}));
+ const debts=data.debts.filter(d=>d.due&&d.due.slice(0,7)===month&&remaining(d)>0).map(d=>({id:d.id,date:d.due,name:d.name,type:d.type,amt:Math.min(remaining(d),d.installment||remaining(d)),isDebt:true}));
+ const exps=data.expenses.map(e=>({id:e.id,date:monthlyExpenseDate(month,e.day),name:e.name,type:e.category,amt:Number(e.amount)||0,isDebt:false,paid:expensePaid(e.id,month)}));
  return [...debts,...exps].sort((a,b)=>a.date.localeCompare(b.date));
 }
 function renderCalendar(){
  const m=document.getElementById('calMonth').value||today().slice(0,7),now=today(),all=calendarEvents(m);
- const overdue=data.debts.filter(d=>d.due&&d.due<now&&remaining(d)>0).map(d=>({date:d.due,name:d.name,amt:Math.min(remaining(d),d.installment||remaining(d))}));
+ const overdue=data.debts.filter(d=>d.due&&d.due<now&&remaining(d)>0).map(d=>({id:d.id,date:d.due,name:d.name,amt:Math.min(remaining(d),d.installment||remaining(d))}));
  const end=addDays(now,7),next=[];
  [now.slice(0,7),end.slice(0,7)].filter((v,i,a)=>a.indexOf(v)===i).forEach(month=>calendarEvents(month).forEach(item=>{if(item.date>=now&&item.date<=end)next.push(item)}));
  const alerts=document.getElementById('calendarAlerts');
  if(alerts){
-  const overdueHtml=overdue.length?overdue.map(d=>'<div class="history-item"><span><b class="red">'+esc(d.name)+'</b><br><span class="small">Geciken borç · Vade: '+d.date+'</span></span><b class="red">'+money(d.amt)+'</b></div>').join(''):'<div class="small green">Gecikmiş borç kaydı görünmüyor.</div>';
-  const nextHtml=next.length?next.map(d=>'<div class="history-item"><span><b>'+esc(d.name)+'</b><br><span class="small">'+(d.isDebt?'Borç ödemesi':'Sabit gider')+' · '+d.date+'</span></span><b>'+money(d.amt)+'</b></div>').join(''):'<div class="small">Önümüzdeki 7 gün içinde kayıtlı vade bulunmuyor.</div>';
-  alerts.innerHTML='<b class="small">Geciken borçlar</b>'+overdueHtml+'<div style="height:12px"></div><b class="small">Önümüzdeki 7 gün</b>'+nextHtml+'<p class="small">Sabit giderler için ödeme yapıldı bilgisi tutulmadığından bunlar vade hatırlatmasıdır; ödenmiş/ödenmemiş durumunu göstermez.</p>';
+  const overdueHtml=overdue.length?overdue.map(d=>'<div class="history-item"><span><b class="red">'+esc(d.name)+'</b><br><span class="small">Geciken borç · Vade: '+d.date+'</span></span><span><b class="red">'+money(d.amt)+'</b><br><button class="ghost" onclick="openPay(\''+d.id+'\')">Ödeme gir</button></span></div>').join(''):'<div class="small green">Gecikmiş borç kaydı görünmüyor.</div>';
+  const nextHtml=next.length?next.map(d=>'<div class="history-item"><span><b>'+esc(d.name)+'</b><br><span class="small">'+(d.isDebt?'Borç ödemesi':'Sabit gider')+' · '+d.date+'</span></span><span><b>'+money(d.amt)+'</b><br>'+(d.isDebt?'<button class="ghost" onclick="openPay(\''+d.id+'\')">Ödeme gir</button>':'<button class="ghost" onclick="toggleExpensePaid(\''+d.id+'\',\''+d.date.slice(0,7)+'\')">'+(d.paid?'Ödendi ✓':'Ödendi işaretle')+'</button>')+'</span></div>').join(''):'<div class="small">Önümüzdeki 7 gün içinde kayıtlı vade bulunmuyor.</div>';
+  alerts.innerHTML='<b class="small">Geciken borçlar</b>'+overdueHtml+'<div style="height:12px"></div><b class="small">Önümüzdeki 7 gün</b>'+nextHtml+'<p class="small">Faturalar için ödendi işaretini buradan değiştirebilirsin. Borçlarda gerçek ödeme kaydı için Ödeme gir düğmesini kullan.</p>';
  }
  const debtTotal=all.filter(d=>d.isDebt).reduce((s,d)=>s+d.amt,0);
  const expenseTotal=all.filter(d=>!d.isDebt).reduce((s,d)=>s+d.amt,0);
@@ -735,7 +743,7 @@ function renderCalendar(){
  }
  document.getElementById('calendarList').innerHTML=all.length?Object.keys(dayGroups).sort().map(date=>{
   const items=dayGroups[date],daily=items.reduce((s,d)=>s+d.amt,0);
-  return '<div style="padding:9px 0;border-bottom:1px solid var(--line)"><div class="row"><b>'+new Date(date+'T12:00:00').toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long'})+'</b><b>'+money(daily)+'</b></div>'+items.map(d=>'<div class="history-item"><span><span class="badge '+(d.isDebt?'badge-debt':'badge-fixed')+'">'+(d.isDebt?'Borç':'Gider')+'</span> <b>'+esc(d.name)+'</b><br><span class="small">'+esc(d.type)+'</span></span><b>'+money(d.amt)+'</b></div>').join('')+'</div>';
+  return '<div style="padding:9px 0;border-bottom:1px solid var(--line)"><div class="row"><b>'+new Date(date+'T12:00:00').toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long'})+'</b><b>'+money(daily)+'</b></div>'+items.map(d=>'<div class="history-item"><span><span class="badge '+(d.isDebt?'badge-debt':'badge-fixed')+'">'+(d.isDebt?'Borç':'Gider')+'</span> <b>'+esc(d.name)+'</b><br><span class="small">'+esc(d.type)+(d.paid?' · Ödendi ✓':'')+'</span></span><span><b>'+money(d.amt)+'</b><br>'+(d.isDebt?'<button class="ghost" onclick="openPay(\''+d.id+'\')">Ödeme gir</button>':'<button class="ghost" onclick="toggleExpensePaid(\''+d.id+'\',\''+m+'\')">'+(d.paid?'İşareti kaldır':'Ödendi işaretle')+'</button>')+'</span></div>').join('')+'</div>';
  }).join(''):'<div class="empty">Bu ay için ödeme veya gider bulunmuyor.</div>';
 }
 function renderPlan(){
@@ -1076,7 +1084,7 @@ function restore(e){
       if(parsed.version&&Number(parsed.version)>2)throw new Error('Bu yedek daha yeni bir uygulama sürümüne ait.');
       const restored=parsed.app==='Borctakip'?parsed.data:parsed;
       if(!restored||!Array.isArray(restored.debts)||!Array.isArray(restored.payments))throw new Error('Yedek yapısı geçersiz.');
-      const listKeys=['debts','payments','expenses','incomes','spendings'];
+      const listKeys=['debts','payments','expenses','expensePayments','incomes','spendings'];
       for(const key of listKeys){
         if(restored[key]!==undefined&&(!Array.isArray(restored[key])||!restored[key].every(item=>item&&typeof item==='object'&&!Array.isArray(item))))throw new Error('Yedekte '+key+' listesi hatalı.');
       }
@@ -1107,7 +1115,7 @@ function restore(e){
 
 function clearAll(){
   if(confirm('Tüm borç, ödeme ve gider kayıtları kalıcı olarak silinsin mi?')){
-    data={debts:[],payments:[],expenses:[],incomes:[],spendings:[],income:0,phone:''};
+    data={debts:[],payments:[],expenses:[],expensePayments:[],incomes:[],spendings:[],income:0,phone:''};
     save();
   }
 }
