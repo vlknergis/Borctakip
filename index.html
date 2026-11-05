@@ -331,8 +331,8 @@ let cloudClient=null;
 try{if(window.supabase&&typeof window.supabase.createClient==='function'){cloudClient=window.supabase.createClient(BORCTAKIP_SUPABASE_URL,BORCTAKIP_SUPABASE_KEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}});}}catch(error){console.error('Supabase başlatılamadı',error);}
 function cloudStatus(message){const el=document.getElementById('cloudAuthStatus');if(el)el.textContent=message;}
 function cloudCredentials(){const email=(document.getElementById('cloudEmail')?.value||'').trim();const password=document.getElementById('cloudPassword')?.value||'';if(!email||!password)throw new Error('E-posta ve şifre alanlarını doldur.');if(password.length<8)throw new Error('Şifre en az 8 karakter olmalı.');return {email,password};}
-async function cloudSignUp(){try{if(!cloudClient)throw new Error('Bulut istemcisi yüklenemedi. İnternet bağlantısını kontrol et.');const {email,password}=cloudCredentials();cloudStatus('Hesap oluşturuluyor…');const {data,error}=await cloudClient.auth.signUp({email,password});if(error)throw error;cloudStatus(data.session?'Hesap oluşturuldu ve giriş yapıldı.':'Kayıt isteği alındı. E-postana gelen doğrulama bağlantısını kontrol et.');}catch(error){cloudStatus(error.message||'Hesap oluşturulamadı.');}}
-async function cloudSignIn(){try{if(!cloudClient)throw new Error('Bulut istemcisi yüklenemedi. İnternet bağlantısını kontrol et.');const {email,password}=cloudCredentials();cloudStatus('Giriş yapılıyor…');const {data,error}=await cloudClient.auth.signInWithPassword({email,password});if(error)throw error;cloudStatus('Giriş yapıldı: '+(data.user?.email||email)+'. Bulut yedekleme henüz etkin değil.');}catch(error){cloudStatus(error.message||'Giriş yapılamadı.');}}
+async function cloudSignUp(){try{if(!cloudClient)throw new Error('Bulut istemcisi yüklenemedi. İnternet bağlantısını kontrol et.');const {email,password}=cloudCredentials();cloudStatus('Hesap oluşturuluyor…');const {data,error}=await cloudClient.auth.signUp({email,password});if(error)throw error;cloudStatus(data.session?'Hesap oluşturuldu ve giriş yapıldı. Bulut yedekleme hazır.':'Kayıt isteği alındı. E-postana gelen doğrulama bağlantısını kontrol et.');}catch(error){cloudStatus(error.message||'Hesap oluşturulamadı.');}}
+async function cloudSignIn(){try{if(!cloudClient)throw new Error('Bulut istemcisi yüklenemedi. İnternet bağlantısını kontrol et.');const {email,password}=cloudCredentials();cloudStatus('Giriş yapılıyor…');const {data,error}=await cloudClient.auth.signInWithPassword({email,password});if(error)throw error;cloudStatus('Giriş yapıldı: '+(data.user?.email||email)+'. Bulut yedekleme hazır.');}catch(error){cloudStatus(error.message||'Giriş yapılamadı.');}}
 async function cloudSignOut(){if(!cloudClient){cloudStatus('Bulut bağlantısı hazır değil.');return;}const {error}=await cloudClient.auth.signOut();cloudStatus(error?'Çıkış yapılamadı: '+error.message:'Hesaptan çıkış yapıldı. Cihazdaki yerel kayıtların korunuyor.');}
 let cloudAuthListenerReady=false;
 async function cloudCurrentUser(){
@@ -1426,7 +1426,7 @@ function updateConnectionStatus(){
  if(!pill||!label||!detail)return;
  pill.classList.toggle('offline',!online);
  label.textContent=online?'Ağ bağlantısı var':'Çevrimdışı mod';
- detail.textContent=online?'Kayıtlar bu cihazda saklanıyor · Bulut eşitleme henüz etkin değil.':'Ağ bağlantısı yok · Kayıtlarını bu cihazda kullanmaya devam edebilirsin.';
+ detail.textContent=online?'Kayıtlar bu cihazda saklanır · Bulut yedeğini Ayarlar bölümünden elle yönetebilirsin.':'Ağ bağlantısı yok · Kayıtlarını bu cihazda kullanmaya devam edebilirsin.';
 }
 window.addEventListener('online',updateConnectionStatus);
 window.addEventListener('offline',updateConnectionStatus);
