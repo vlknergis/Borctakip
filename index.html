@@ -398,10 +398,10 @@ async function cloudRefreshBackupInfo(){
   const user=await cloudCurrentUser();
   const current=await cloudGetBackup(user.id);
   const details=document.getElementById('cloudBackupDetails'),historyEl=document.getElementById('cloudBackupHistory');
-  if(details)details.textContent=current?'Son yedek: '+cloudFormatDate(current.updated_at)+' · Toplam '+backupRecordCount(current.payload)+' kayıt · Revizyon '+current.revision+'\\n'+cloudCategoryCounts(current.payload):'Bulutta henüz kayıtlı yedek yok.';
+  if(details)details.textContent=current?'Son yedek: '+cloudFormatDate(current.updated_at)+' · Toplam '+backupRecordCount(current.payload)+' kayıt · Revizyon '+current.revision+'\n'+cloudCategoryCounts(current.payload):'Bulutta henüz kayıtlı yedek yok.';
   const {data:history,error}=await cloudClient.from('user_backup_history').select('id,payload,source_revision,created_at').eq('user_id',user.id).order('created_at',{ascending:false}).limit(5);
   if(error)throw error;
-  if(historyEl)historyEl.textContent=history.length?'Önceki yedekler (son 5):\\n'+history.map((item,index)=>(index+1)+'. '+cloudFormatDate(item.created_at)+' · '+backupRecordCount(item.payload)+' kayıt · revizyon '+item.source_revision).join('\\n'):'Henüz önceki yedek arşivi yok.';
+  if(historyEl)historyEl.textContent=history.length?'Önceki yedekler (son 5):\n'+history.map((item,index)=>(index+1)+'. '+cloudFormatDate(item.created_at)+' · '+backupRecordCount(item.payload)+' kayıt · revizyon '+item.source_revision).join('\n'):'Henüz önceki yedek arşivi yok.';
  }catch(error){const el=document.getElementById('cloudBackupHistory');if(el)el.textContent='Yedek geçmişi alınamadı: '+(error.message||'Bilinmeyen hata')+'. Gerekirse CLOUD_SETUP kurulumunu kontrol et.';}
 }
 async function cloudArchiveCurrentBackup(userId,current){
