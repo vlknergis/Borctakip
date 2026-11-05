@@ -102,6 +102,7 @@ canvas{width:100%!important;height:100%!important}
   <div class="section"><h2>Günlük Harcamalar</h2><button class="primary" onclick="openSpending()">＋ Harcama Ekle</button></div>
   <div class="card"><div class="row"><span>Bu ay harcanan</span><b id="spendingMonthTotal" class="red">₺0,00</b></div><div class="small">Market, ulaşım, yemek ve diğer tek seferlik harcamalar.</div></div>
   <div class="list" id="spendingList"></div>
+  <div class="section"><h2>Harcama Kategorileri</h2></div><div class="card" id="spendingCategories"><div class="small">Henüz harcama verisi yok.</div></div>
   <div class="section"><h2>Aylık Bütçe Özeti</h2></div>
   <div class="card"><div class="row"><span>Gelir (düzenli + kayıtlı)</span><b id="reportIncome" class="green">₺0,00</b></div><div class="row"><span>Sabit giderler</span><b id="reportFixed" class="purple">₺0,00</b></div><div class="row"><span>Günlük harcamalar</span><b id="reportSpending" class="red">₺0,00</b></div><div class="row"><span>Borç ödemeleri</span><b id="reportDebt" class="red">₺0,00</b></div><hr><div class="row"><b>Ay sonu kalan</b><b id="reportBalance">₺0,00</b></div></div>
 </section>
@@ -415,6 +416,11 @@ function monthlySpending(month=today().slice(0,7)){
 function renderSpendings(){
   const month=today().slice(0,7);
   document.getElementById('spendingMonthTotal').textContent=money(monthlySpending(month));
+  const categoryTotals={};
+  data.spendings.filter(x=>x.date&&x.date.slice(0,7)===month).forEach(x=>{const key=x.category||'Diğer';categoryTotals[key]=(categoryTotals[key]||0)+(Number(x.amount)||0)});
+  const categoryRows=Object.entries(categoryTotals).sort((a,b)=>b[1]-a[1]);
+  const categoryMax=Math.max(1,...categoryRows.map(x=>x[1]));
+  document.getElementById('spendingCategories').innerHTML=categoryRows.length?categoryRows.map(([name,value])=>`<div style="margin:10px 0"><div class="row"><span>${esc(name)}</span><b>${money(value)}</b></div><div style="height:7px;background:var(--line);border-radius:8px;overflow:hidden"><div style="height:100%;width:${(value/categoryMax*100).toFixed(1)}%;background:var(--blue);border-radius:8px"></div></div></div>`).join(''):'<div class="small">Bu ay henüz harcama kaydı yok.</div>';
   const list=document.getElementById('spendingList');
   const items=[...data.spendings].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   list.innerHTML=items.length?items.map(x=>`
@@ -541,7 +547,7 @@ function renderSuggestions(){
   let fixedTotal = data.expenses.reduce((s,e)=>s+e.amount,0);
   let box = document.getElementById('aiAdviceBox');
   let income = (Number(data.income)||0)+monthlyIncome();
-  let net = income - fixedTotal;
+  let net = income - fixedTotal - monthlySpending();
 
   let html = '';
   if(income === 0){
@@ -796,7 +802,7 @@ function render(){
   let fixedTotal = data.expenses.reduce((s,e)=>s+e.amount,0);
   document.getElementById('fixedVal').textContent=money(fixedTotal);
 
-  let net = (data.income||0) - (paid + fixedTotal);
+  let net = (Number(data.income)||0) + monthlyIncome(month) - (paid + fixedTotal + monthlySpending(month));
   let netEl = document.getElementById('netBudget');
   netEl.textContent = money(net);
   netEl.className = 'stat-val ' + (net>=0 ? 'green' : 'red');
