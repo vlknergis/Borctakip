@@ -155,6 +155,7 @@ canvas{width:100%!important;height:100%!important}
     <input id="calMonth" type="month" onchange="renderCalendar()" style="max-width:145px;padding:8px;border:1px solid var(--line);border-radius:9px">
   </div>
   <div class="card"><b>Geciken ve Yaklaşan Ödemeler</b><div id="calendarAlerts" style="margin-top:10px"><div class="small">Ödeme kayıtları yükleniyor...</div></div></div>
+  <div class="card" id="calendarSummary" style="margin-bottom:10px"></div>
   <div class="card" id="calendarList"></div>
   <div class="card" style="margin-top:10px">
     <b>Ödeme ve Gider Hatırlatmaları</b>
@@ -724,7 +725,18 @@ function renderCalendar(){
   const nextHtml=next.length?next.map(d=>'<div class="history-item"><span><b>'+esc(d.name)+'</b><br><span class="small">'+(d.isDebt?'Borç ödemesi':'Sabit gider')+' · '+d.date+'</span></span><b>'+money(d.amt)+'</b></div>').join(''):'<div class="small">Önümüzdeki 7 gün içinde kayıtlı vade bulunmuyor.</div>';
   alerts.innerHTML='<b class="small">Geciken borçlar</b>'+overdueHtml+'<div style="height:12px"></div><b class="small">Önümüzdeki 7 gün</b>'+nextHtml+'<p class="small">Sabit giderler için ödeme yapıldı bilgisi tutulmadığından bunlar vade hatırlatmasıdır; ödenmiş/ödenmemiş durumunu göstermez.</p>';
  }
- document.getElementById('calendarList').innerHTML=all.length?all.map(d=>'<div class="history-item"><span><b>'+new Date(d.date+'T12:00:00').toLocaleDateString('tr-TR',{day:'numeric',month:'long'})+'</b> <span class="badge '+(d.isDebt?'badge-debt':'badge-fixed')+'">'+(d.isDebt?'Borç':'Gider')+'</span><br><span class="small">'+esc(d.name)+' ('+esc(d.type)+')</span></span><b>'+money(d.amt)+'</b></div>').join(''):'<div class="empty">Bu ay için ödeme veya gider bulunmuyor.</div>';
+ const debtTotal=all.filter(d=>d.isDebt).reduce((s,d)=>s+d.amt,0);
+ const expenseTotal=all.filter(d=>!d.isDebt).reduce((s,d)=>s+d.amt,0);
+ const dayGroups={};
+ all.forEach(item=>{(dayGroups[item.date]||(dayGroups[item.date]=[])).push(item)});
+ const summary=document.getElementById('calendarSummary');
+ if(summary){
+  summary.innerHTML='<div class="row"><span>Seçilen ay toplamı</span><b>'+money(debtTotal+expenseTotal)+'</b></div><div class="row" style="margin-top:8px"><span class="small">Borç ödemeleri ('+all.filter(d=>d.isDebt).length+')</span><b class="red">'+money(debtTotal)+'</b></div><div class="row" style="margin-top:6px"><span class="small">Sabit giderler ('+all.filter(d=>!d.isDebt).length+')</span><b>'+money(expenseTotal)+'</b></div><div class="row" style="margin-top:6px"><span class="small">Ödeme/vade günü</span><b>'+Object.keys(dayGroups).length+' gün</b></div>';
+ }
+ document.getElementById('calendarList').innerHTML=all.length?Object.keys(dayGroups).sort().map(date=>{
+  const items=dayGroups[date],daily=items.reduce((s,d)=>s+d.amt,0);
+  return '<div style="padding:9px 0;border-bottom:1px solid var(--line)"><div class="row"><b>'+new Date(date+'T12:00:00').toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long'})+'</b><b>'+money(daily)+'</b></div>'+items.map(d=>'<div class="history-item"><span><span class="badge '+(d.isDebt?'badge-debt':'badge-fixed')+'">'+(d.isDebt?'Borç':'Gider')+'</span> <b>'+esc(d.name)+'</b><br><span class="small">'+esc(d.type)+'</span></span><b>'+money(d.amt)+'</b></div>').join('')+'</div>';
+ }).join(''):'<div class="empty">Bu ay için ödeme veya gider bulunmuyor.</div>';
 }
 function renderPlan(){
  const budget=Number(document.getElementById('monthlyBudget').value)||0;
