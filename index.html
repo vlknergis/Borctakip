@@ -401,8 +401,42 @@ async function cloudRefreshBackupInfo(){
   if(details)details.textContent=current?'Son yedek: '+cloudFormatDate(current.updated_at)+' · Toplam '+backupRecordCount(current.payload)+' kayıt · Revizyon '+current.revision+'\n'+cloudCategoryCounts(current.payload):'Bulutta henüz kayıtlı yedek yok.';
   const {data:history,error}=await cloudClient.from('user_backup_history').select('id,payload,source_revision,created_at').eq('user_id',user.id).order('created_at',{ascending:false}).limit(5);
   if(error)throw error;
-  if(historyEl)historyEl.textContent=history.length?'Önceki yedekler (son 5):\n'+history.map((item,index)=>(index+1)+'. '+cloudFormatDate(item.created_at)+' · '+backupRecordCount(item.payload)+' kayıt · revizyon '+item.source_revision).join('\n'):'Henüz önceki yedek arşivi yok.';
+  if(historyEl){
+   historyEl.replaceChildren();
+   if(!history.length){historyEl.textContent='Henüz önceki yedek arşivi yok.';}
+   else{
+    history.forEach((item,index)=>{
+     const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--line)';
+     const info=document.createElement('span');info.textContent=(index+1)+'. '+cloudFormatDate(item.created_at)+' · '+backupRecordCount(item.payload)+' kayıt · revizyon '+item.source_revision;
+     const btn=document.createElement('button');btn.type='button';btn.className='ghost';btn.textContent='Bu yedeği geri yükle';btn.onclick=()=>cloudRestoreHistory(item.id);
+     row.append(info,btn);historyEl.appendChild(row);
+    });
+   }
+  }
  }catch(error){const el=document.getElementById('cloudBackupHistory');if(el)el.textContent='Yedek geçmişi alınamadı: '+(error.message||'Bilinmeyen hata')+'. Gerekirse CLOUD_SETUP kurulumunu kontrol et.';}
+}
+async function cloudRestoreHistory(historyId){
+ try{
+  const user=await cloudCurrentUser();
+  const id=Number(historyId);
+  if(!Number.isSafeInteger(id)||id<=0)throw new Error('Yedek kayıt numarası geçersiz.');
+  const {data:item,error}=await cloudClient.from('user_backup_history').select('payload,schema_version,source_revision,created_at').eq('id',id).eq('user_id',user.id).single();
+  if(error)throw error;
+  if(Number(item.schema_version)!==2)throw new Error('Bu eski yedek farklı bir şema sürümünde; güvenli geri yükleme durduruldu.');
+  cloudValidatePayload(item.payload);
+  const count=backupRecordCount(item.payload),date=cloudFormatDate(item.created_at);
+  if(!confirm('Seçilen eski yedek: '+date+'\\nKayıt sayısı: '+count+'\\nRevizyon: '+item.source_revision+'\\n\\nBu işlem telefondaki mevcut kayıtların yerine seçilen yedeği yükler. Önce mevcut telefon verileri güvenlik kopyasına alınacak. Devam edilsin mi?'))return;
+  const oldData=cloudSaveLocalSafetyCopy();
+  const restored={...item.payload};
+  ['debts','payments','expenses','expensePayments','incomes','spendings'].forEach(key=>{if(!Array.isArray(restored[key]))restored[key]=[];});
+  if(!Number.isFinite(Number(restored.income)))restored.income=0;
+  if(typeof restored.phone!=='string')restored.phone='';
+  if(!Number.isFinite(Number(restored.monthlySavingsGoal)))restored.monthlySavingsGoal=0;
+  data=restored;
+  if(!save()){data=oldData;throw new Error('Cihaza kaydedilemedi. Eski kayıtlar bellekte korundu.');}
+  cloudStatus('Seçilen eski yedek telefona geri yüklendi. Buluttaki güncel yedek değiştirilmedi.');
+  alert('Eski yedek telefona yüklendi. Önceki telefon verilerinin güvenlik kopyası da saklandı. Buluttaki güncel yedek korunuyor.');
+ }catch(error){cloudStatus('Eski yedek geri yüklenemedi: '+(error.message||'Bilinmeyen hata'));}
 }
 async function cloudArchiveCurrentBackup(userId,current){
  const {error}=await cloudClient.from('user_backup_history').insert({user_id:userId,payload:current.payload,schema_version:current.schema_version,source_revision:current.revision});
