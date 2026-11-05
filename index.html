@@ -841,16 +841,31 @@ function simulatePlanScenario(budget,strategy){
 }
 function renderPlanComparison(budget){
  const budgets=[budget,Math.round(budget*1.1/100)*100,Math.round(budget*1.2/100)*100];
- const rows=budgets.map((amount,index)=>{
-  const snow=simulatePlanScenario(amount,'small');
-  const avalanche=simulatePlanScenario(amount,'rate');
-  const duration=result=>result.months===null?'Yetersiz / 600+ ay':result.months+' ay';
-  const interest=result=>result.interest===null?'—':money(result.interest);
-  return '<tr><td>'+ (index===0?'Mevcut':index===1?'+%10':'+%20')+'<br><b>'+money(amount)+'</b></td><td>'+duration(snow)+'<br><span class="small">'+interest(snow)+' faiz</span></td><td>'+duration(avalanche)+'<br><span class="small">'+interest(avalanche)+' faiz</span></td></tr>';
+ const scenarios=budgets.map(amount=>({amount,snow:simulatePlanScenario(amount,'small'),avalanche:simulatePlanScenario(amount,'rate')}));
+ const duration=result=>result.months===null?'Yetersiz / 600+ ay':result.months+' ay';
+ const interest=result=>result.interest===null?'—':money(result.interest);
+ const rows=scenarios.map((item,index)=>{
+  return '<tr><td>'+ (index===0?'Mevcut':index===1?'+%10':'+%20')+'<br><b>'+money(item.amount)+'</b></td><td>'+duration(item.snow)+'<br><span class="small">'+interest(item.snow)+' faiz</span></td><td>'+duration(item.avalanche)+'<br><span class="small">'+interest(item.avalanche)+' faiz</span></td></tr>';
  }).join('');
- return '<div class="card" style="margin-top:12px"><b>Ödeme bütçesi ve strateji karşılaştırması</b><p class="small">Aynı borçlar için kartopu ve çığ yöntemlerini karşılaştırır. +%10 ve +%20 senaryoları örnektir.</p><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="text-align:left;padding:7px">Aylık bütçe</th><th style="text-align:left;padding:7px">Kartopu</th><th style="text-align:left;padding:7px">Çığ</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+ const base=scenarios[0];
+ let advice='';
+ if(base.snow.months!==null&&base.avalanche.months!==null){
+  const saved=base.snow.interest-base.avalanche.interest;
+  if(Math.abs(saved)>0.01){
+   advice=saved>0
+    ? 'Çığ yöntemi bu varsayımlarla yaklaşık <b>'+money(saved)+'</b> daha az faiz oluşturuyor.'
+    : 'Kartopu yöntemi bu varsayımlarla yaklaşık <b>'+money(Math.abs(saved))+'</b> daha az faiz oluşturuyor.';
+  }else{
+   advice='İki yöntemin tahmini faiz maliyeti birbirine çok yakın.';
+  }
+  if(base.snow.months!==base.avalanche.months){
+   advice+=' Borçsuz kalma süresi: kartopu '+duration(base.snow)+', çığ '+duration(base.avalanche)+'.';
+  }
+ }else{
+  advice='Mevcut bütçede asgari/taksit toplamı karşılanmadığı için yöntemler arasında güvenilir kıyas yapılamıyor.';
+ }
+ return '<div class="card" style="margin-top:12px"><b>Ödeme bütçesi ve strateji karşılaştırması</b><p class="small">Aynı borçlar için kartopu ve çığ yöntemlerini karşılaştırır. +%10 ve +%20 senaryoları örnektir.</p><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="text-align:left;padding:7px">Aylık bütçe</th><th style="text-align:left;padding:7px">Kartopu</th><th style="text-align:left;padding:7px">Çığ</th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="small" style="margin-top:10px"><b>Karşılaştırma:</b> '+advice+'</p></div>';
 }
-
 /* GRAFİK ÇİZİMİ */
 function renderChart(){
   const canvas=document.getElementById('payChart');
