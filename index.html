@@ -407,8 +407,13 @@ async function cloudRefreshBackupInfo(){
    else{
     history.forEach((item,index)=>{
      const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--line)';
-     const info=document.createElement('span');info.textContent=(index+1)+'. '+cloudFormatDate(item.created_at)+' · '+backupRecordCount(item.payload)+' kayıt · revizyon '+item.source_revision;
-     const btn=document.createElement('button');btn.type='button';btn.className='ghost';btn.textContent='Bu yedeği geri yükle';btn.onclick=()=>cloudRestoreHistory(item.id);
+     const p=item.payload||{},parts=[['Borç',p.debts],['Ödeme',p.payments],['Gelir',p.incomes],['Gider',p.expenses],['Gider ödemesi',p.expensePayments],['Diğer harcama',p.spendings]];
+     const info=document.createElement('div');info.style.cssText='flex:1;min-width:220px';
+     const heading=document.createElement('b');heading.textContent='Yedek #'+(index+1)+' · '+cloudFormatDate(item.created_at);
+     const detail=document.createElement('div');detail.className='small';detail.style.cssText='margin-top:4px;line-height:1.6';
+     detail.textContent=parts.map(([label,list])=>label+': '+(Array.isArray(list)?list.length:0)).join(' · ')+'\\nToplam kayıt: '+backupRecordCount(p)+' · Revizyon: '+item.source_revision;
+     info.append(heading,detail);
+     const btn=document.createElement('button');btn.type='button';btn.className='ghost';btn.textContent='Bu yedeği geri yükle';btn.setAttribute('aria-label',cloudFormatDate(item.created_at)+' tarihli, '+backupRecordCount(p)+' kayıtlı yedeği geri yükle');btn.onclick=()=>cloudRestoreHistory(item.id);
      row.append(info,btn);historyEl.appendChild(row);
     });
    }
