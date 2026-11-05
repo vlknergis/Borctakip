@@ -35,7 +35,7 @@ canvas{width:100%!important;height:100%!important}
 .ticker-bar{background:#101827;color:#fff;padding:10px 15px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
 .ticker-item{display:flex;flex-direction:column;align-items:center}
 .ticker-title{font-size:10px;color:#94a3b8}
-.ticker-val{font-weight:700;font-size:13px;margin-top:2px}
+.ticker-val{font-weight:700;font-size:12px;margin-top:2px;white-space:normal;text-align:center;line-height:1.25}
 .news-card{border-left:4px solid var(--blue);padding-left:12px;margin-bottom:12px}
 @media(min-width:600px){main{padding-top:22px}.modal{align-items:center}.sheet{border-radius:22px}}
 </style>
@@ -86,7 +86,7 @@ canvas{width:100%!important;height:100%!important}
     <div class="ticker-item"><span class="ticker-title">GRAM ALTIN</span><span class="ticker-val" id="goldRate">Yükleniyor...</span></div>
   </div>
   <div class="small" id="marketUpdated" style="margin:-5px 2px 12px">Döviz ve altın verileri alınıyor...</div>
-  <div class="small" style="margin:-6px 2px 12px">Altın: spot piyasa gram karşılığıdır; kuyumcu alış/satış fiyatı ve işçilik içermez. Döviz kaynağı: <a href="https://cxrates.com/" target="_blank" rel="noopener">CxRates</a>. Gram altın alış/satış: <a href="https://turkpidya.com/gold-prices/" target="_blank" rel="noopener">Turkpidya</a>; spot yedek: <a href="https://gold-api.com/" target="_blank" rel="noopener">Gold API</a>.</div>
+  <div class="small" style="margin:-6px 2px 12px">Altın: spot piyasa gram karşılığıdır; kuyumcu alış/satış fiyatı ve işçilik içermez. Döviz kaynağı: <a href="https://cxrates.com/" target="_blank" rel="noopener">CxRates</a>. Gram altın alış/satış: <a href="https://turkpidya.com/gold-prices/" target="_blank" rel="noopener">Turkpidya</a> (A=alış, S=satış); spot yedek: <a href="https://gold-api.com/" target="_blank" rel="noopener">Gold API</a>.</div>
 
   <p class="notice">Verileriniz cihazınızda saklanır (`borctakip_v2`). Eski kayıtlarınız (`borctakip_v1`) geçiş sırasında silinmez. Düzenli yedek almayı unutmayın.</p>
 </section>
