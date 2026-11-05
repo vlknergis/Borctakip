@@ -185,7 +185,8 @@ canvas{width:100%!important;height:100%!important}
   <div class="section"><h2>Veriler & Ayarlar</h2></div>
   <div class="card">
     <div class="field">
-      <label><b>Aylık Toplam Net Gelir (₺)</b></label>
+      <label><b>Eski kayıtlardan gelen sabit aylık gelir (₺)</b></label>
+      <div class="small">Yeni maaş, kira ve ek gelirlerini Gelir sekmesinden tarihli olarak ekle. Aynı geliri iki kez kaydetme.</div>
       <input id="incomeInput" type="number" step="100" placeholder="Örn. 45000" onchange="saveIncome()">
     </div>
     <div class="field">
@@ -855,6 +856,11 @@ function restore(e){
       let x=JSON.parse(r.result);
       if(!Array.isArray(x.debts)||!Array.isArray(x.payments))throw 0;
       if(confirm('Mevcut kayıtların yedek dosyasındaki kayıtlarla değiştirilsin mi?')){
+        if(!Array.isArray(x.expenses))x.expenses=[];
+        if(!Array.isArray(x.incomes))x.incomes=[];
+        if(!Array.isArray(x.debts))x.debts=[];
+        if(!Array.isArray(x.payments))x.payments=[];
+        if(!Number.isFinite(Number(x.income)))x.income=0;
         data=x;save();alert('Yedek başarıyla geri yüklendi.');
       }
     }catch{alert('Geçersiz yedek dosyası.')}
