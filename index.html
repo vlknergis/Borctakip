@@ -11,6 +11,7 @@
 :root{--bg:#f3f6fb;--card:#fff;--ink:#172033;--muted:#718096;--line:#e7edf5;--navy:#101827;--blue:#3568e8;--green:#15966b;--red:#d94b5b;--amber:#c78319;--purple:#7c3aed}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 header{background:linear-gradient(135deg,#101827,#20385f);color:white;padding:25px 18px 28px;border-radius:0 0 25px 25px}
+.connection-status{max-width:760px;margin:0 auto;padding:8px 14px 0;font-size:11px;color:var(--muted)}.connection-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:20px;background:#e8f7ef;color:#137a50;font-weight:700}.connection-pill.offline{background:#fff1df;color:#9a5b08}.connection-detail{margin-left:7px}
 .top{display:flex;justify-content:space-between;align-items:center}.brand{font-weight:800;font-size:20px;letter-spacing:.2px}.tag{font-size:11px;color:#c8d5ed;background:#ffffff18;padding:6px 10px;border-radius:20px}
 .total-label{color:#c3cee0;font-size:13px;margin-top:20px}.total{font-size:32px;font-weight:800;letter-spacing:-1px;margin:3px 0}.sub{font-size:12px;color:#c3cee0}
 main{max-width:760px;margin:auto;padding:16px 14px 130px}.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:-2px}
@@ -47,6 +48,7 @@ canvas{width:100%!important;height:100%!important}
   <div class="total" id="total">₺0,00</div>
   <div class="sub" id="debtCount">Yükleniyor...</div>
 </header>
+<div class="connection-status"><span id="connectionPill" class="connection-pill"><span id="connectionDot">●</span><span id="connectionLabel">Bağlantı kontrol ediliyor</span></span><span id="connectionDetail" class="connection-detail">Kayıtlar bu cihazda saklanır.</span></div>
 <main>
 <section id="home" class="view active">
   <div class="stats">
@@ -360,7 +362,7 @@ function addDays(dateStr, days) {
   return dateKey(d);
 }
 
-function save(){localStorage.setItem(KEY,JSON.stringify(data));render()}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(data));const d=document.getElementById('connectionDetail');if(d)d.textContent='Kayıtlar bu cihazda saklanıyor · '+new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});render();return true}catch(error){alert('Kayıt cihaz hafızasına yazılamadı. Depolama alanını kontrol et; uygulama verilerini silme.');return false}}
 function remaining(d){return Math.max(0,d.amount-data.payments.filter(p=>p.debtId===d.id).reduce((a,p)=>a+p.amount,0))}
 
 /* GELİR KAYITLARI */
@@ -1299,6 +1301,17 @@ render();
 fetchMarketRates();
 setInterval(fetchMarketRates,60000);
 calculateLoan();
+function updateConnectionStatus(){
+ const online=navigator.onLine;
+ const pill=document.getElementById('connectionPill'),label=document.getElementById('connectionLabel'),detail=document.getElementById('connectionDetail');
+ if(!pill||!label||!detail)return;
+ pill.classList.toggle('offline',!online);
+ label.textContent=online?'İnternet bağlantısı var':'Çevrimdışı mod';
+ detail.textContent=online?'Kayıtlar bu cihazda saklanıyor · Bulut eşitleme henüz etkin değil.':'İnternet yok · Kayıtlarını bu cihazda kullanmaya devam edebilirsin.';
+}
+window.addEventListener('online',updateConnectionStatus);
+window.addEventListener('offline',updateConnectionStatus);
+updateConnectionStatus();
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 checkReminders();
 setInterval(checkReminders,60000);
