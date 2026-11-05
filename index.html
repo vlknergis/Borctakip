@@ -198,6 +198,7 @@ canvas{width:100%!important;height:100%!important}
 
 <section id="payments" class="view">
   <div class="section"><h2>Ödeme Geçmişi</h2><span class="small" id="paymentCount"></span></div>
+  <div class="card"><div class="field"><label>Ay seç</label><input id="paymentMonth" type="month" onchange="render()"></div><div id="paymentSummary" class="small"></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="ghost" onclick="setPaymentMonth(0)">Bu ay</button><button class="ghost" onclick="setPaymentMonth(-1)">Önceki ay</button><button class="ghost" onclick="setPaymentMonth(null)">Tüm zamanlar</button></div></div>
   <div class="card" id="allPayments"></div>
 </section>
 
@@ -928,6 +929,13 @@ function renderChart(){
   });
 }
 
+function setPaymentMonth(offset){
+ const el=document.getElementById('paymentMonth');
+ if(offset===null)el.value='';
+ else {const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+offset);el.value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+ render();
+}
+
 function render(){
   document.getElementById('incomeInput').value = data.income || '';
   document.getElementById('phoneInput').value = data.phone || '';
@@ -960,9 +968,12 @@ function render(){
   let recent=[...data.payments].sort((a,b)=>b.date.localeCompare(b.date)).slice(0,4);
   document.getElementById('recent').innerHTML=recent.length?recent.map(p=>`<div class="history-item"><span>${esc(data.debts.find(d=>d.id===p.debtId)?.name||p.debtName||'Silinmiş borç')}<br><span class="small">${p.date} ${p.note?'· '+esc(p.note):''}</span></span><b class="green">−${money(p.amount)}</b></div>`).join(''):'<div class="empty">Henüz ödeme kaydı yok.</div>';
   
-  let all=[...data.payments].sort((a,b)=>b.date.localeCompare(a.date));
+  let selected=document.getElementById('paymentMonth')?.value||'';
+  let all=[...data.payments].filter(p=>!selected||(p.date&&p.date.slice(0,7)===selected)).sort((a,b)=>b.date.localeCompare(a.date));
+  let paidTotal=all.reduce((s,p)=>s+(Number(p.amount)||0),0);
   document.getElementById('paymentCount').textContent=all.length+' işlem';
-  document.getElementById('allPayments').innerHTML=all.length?all.map(p=>`<div class="history-item"><span>${esc(data.debts.find(d=>d.id===p.debtId)?.name||'Silinmiş borç')}<br><span class="small">${p.date}${p.note?' · '+esc(p.note):''}</span></span><b class="green">−${money(p.amount)}</b></div>`).join(''):'<div class="empty">Ödeme yaptığında burada görünecek.</div>'; 
+  document.getElementById('paymentSummary').innerHTML='<div class="row"><span>Toplam ödenen</span><b>'+money(paidTotal)+'</b></div><div class="small" style="margin-top:5px">'+all.length+' ödeme kaydı · '+(selected||'Tüm dönemler')+'</div>';
+  document.getElementById('allPayments').innerHTML=all.length?all.map(p=>`<div class="history-item"><span>${esc(data.debts.find(d=>d.id===p.debtId)?.name||p.debtName||'Silinmiş borç')}<br><span class="small">${p.date}${p.note?' · '+esc(p.note):''}</span></span><b class="green">−${money(p.amount)}</b></div>`).join(''):'<div class="empty">Bu dönemde ödeme kaydı yok.</div>'; 
   
   renderIncomes();
   renderExpenses();
