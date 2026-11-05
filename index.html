@@ -1478,17 +1478,22 @@ function restore(e){
 
 function downloadSafetyBackup(){
  try{
-  const raw=localStorage.getItem('borctakip_pre_restore_backup');
-  if(!raw){alert('Henüz geri yükleme güvenlik kopyası bulunmuyor.');return;}
-  const payload=JSON.parse(raw);
-  if(payload.app!=='Borctakip'||!payload.data)throw new Error('Güvenlik kopyası geçersiz.');
-  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const snapshot=JSON.parse(JSON.stringify(data));
+  const payload={app:'Borctakip',version:2,exportedAt:new Date().toISOString(),recordCount:backupRecordCount(snapshot),data:snapshot};
+  const serialized=JSON.stringify(payload,null,2);
+  localStorage.setItem('borctakip_pre_restore_backup',serialized);
+  const blob=new Blob([serialized],{type:'application/json'});
   const url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download='borctakip-onceki-veri-guvenlik-'+today()+'.json';
-  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
+  a.href=url;a.download='borctakip-guvenlik-kopyasi-'+today()+'.json';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),3000);
   const status=document.getElementById('backupStatus');
-  if(status)status.textContent='Geri yükleme öncesi güvenlik kopyasının indirilmesi başlatıldı. Kayıt sayısı: '+(payload.recordCount||backupRecordCount(payload.data))+'.';
- }catch(error){alert('Güvenlik kopyası indirilemedi: '+(error.message||'Bilinmeyen hata'));}
+  if(status)status.textContent='Güvenlik kopyası oluşturuldu ve indirme başlatıldı · '+payload.recordCount+' kayıt · '+new Date(payload.exportedAt).toLocaleString('tr-TR')+'. İndirilenler klasörünü kontrol et.';
+ }catch(error){
+  const status=document.getElementById('backupStatus');
+  if(status)status.textContent='Güvenlik kopyası oluşturulamadı: '+(error.message||'Bilinmeyen hata');
+  alert('Güvenlik kopyası oluşturulamadı: '+(error.message||'Bilinmeyen hata'));
+ }
 }
 
 function clearAll(){
