@@ -397,7 +397,10 @@ function cloudDebtAmounts(payload){
  const p=payload||{},debts=Array.isArray(p.debts)?p.debts:[],payments=Array.isArray(p.payments)?p.payments:[];
  const original=debts.reduce((sum,d)=>sum+(Number(d.amount)||0),0);
  const paid=payments.filter(pay=>debts.some(d=>d.id===pay.debtId)).reduce((sum,pay)=>sum+(Number(pay.amount)||0),0);
- return {original,remaining:Math.max(0,original-paid)};
+ return {original,paid,remaining:Math.max(0,original-paid)};
+}
+function cloudFullTL(value){
+ return new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value)||0)+' TL';
 }
 async function cloudRefreshBackupInfo(){
  try{
@@ -426,7 +429,7 @@ async function cloudRefreshBackupInfo(){
      const stats=document.createElement('div');stats.style.cssText='display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:5px';
      parts.forEach(([label,list])=>{const cell=document.createElement('div');cell.style.cssText='min-width:0;text-align:center;padding:4px 2px;border-radius:6px;background:var(--soft,rgba(127,127,127,.08))';const number=document.createElement('b');number.style.cssText='display:block;font-size:13px';number.textContent=Array.isArray(list)?list.length:0;const caption=document.createElement('span');caption.className='small';caption.style.cssText='font-size:10px';caption.textContent=label;cell.append(number,caption);stats.appendChild(cell);});
      const amounts=cloudDebtAmounts(p);
-     const meta=document.createElement('div');meta.className='small';meta.style.cssText='font-size:10px;margin-top:3px;line-height:1.45';meta.textContent='Toplam '+backupRecordCount(p)+' kayıt · Kalan borç: '+money(amounts.remaining);
+     const meta=document.createElement('div');meta.className='small';meta.style.cssText='font-size:10px;margin-top:3px;line-height:1.45';meta.textContent='Toplam '+backupRecordCount(p)+' kayıt · Borç: '+cloudFullTL(amounts.original)+' · Ödenen: '+cloudFullTL(amounts.paid)+' · Kalan: '+cloudFullTL(amounts.remaining);
      info.append(heading,stats,meta);
      const btn=document.createElement('button');btn.type='button';btn.className='ghost';btn.style.cssText='padding:6px 8px;font-size:11px;white-space:nowrap;flex-shrink:0';btn.textContent='Geri yükle';btn.setAttribute('aria-label',cloudFormatDate(item.created_at)+' tarihli, '+backupRecordCount(p)+' kayıtlı yedeği geri yükle');btn.onclick=()=>cloudRestoreHistory(item.id);
      row.append(info,btn);historyEl.appendChild(row);
