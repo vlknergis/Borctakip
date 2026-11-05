@@ -112,7 +112,7 @@ canvas{width:100%!important;height:100%!important}
   <div class="section"><h2>Günlük Harcamalar</h2><button class="primary" onclick="openSpending()">＋ Harcama Ekle</button></div>
   <div class="card"><div class="row"><span>Seçilen ayda harcanan</span><b id="spendingMonthTotal" class="red">₺0,00</b></div><div class="small">Market, ulaşım, yemek ve diğer tek seferlik harcamalar.</div></div>
   <div class="list" id="spendingList"></div>
-  <div class="section"><h2>Harcama Kategorileri</h2></div><div class="card" id="spendingCategories"><div class="small">Henüz harcama verisi yok.</div></div>
+  <div class="section"><h2>Harcama Kategorileri</h2></div><div class="card"><div id="categoryPie" style="width:190px;height:190px;border-radius:50%;margin:8px auto 18px;background:var(--line);position:relative;display:grid;place-items:center"><div style="width:112px;height:112px;border-radius:50%;background:var(--card);display:grid;place-items:center;text-align:center"><b id="categoryPieTotal">₺0</b><span class="small">Toplam</span></div></div><div id="spendingCategories"><div class="small">Henüz harcama verisi yok.</div></div></div>
   <div class="section"><h2>Aylık Bütçe Özeti</h2></div>
   <div class="card">
     <div class="field"><label for="reportMonth">Raporlanacak ay</label><input id="reportMonth" type="month" onchange="renderSpendings()"></div>
@@ -446,8 +446,15 @@ function renderSpendings(){
   const categoryTotals={};
   data.spendings.filter(x=>x.date&&x.date.slice(0,7)===month).forEach(x=>{const key=x.category||'Diğer';categoryTotals[key]=(categoryTotals[key]||0)+(Number(x.amount)||0)});
   const categoryRows=Object.entries(categoryTotals).sort((a,b)=>b[1]-a[1]);
-  const categoryMax=Math.max(1,...categoryRows.map(x=>x[1]));
-  document.getElementById('spendingCategories').innerHTML=categoryRows.length?categoryRows.map(([name,value])=>'<div style="margin:10px 0"><div class="row"><span>'+esc(name)+'</span><b>'+money(value)+'</b></div><div style="height:7px;background:var(--line);border-radius:8px;overflow:hidden"><div style="height:100%;width:'+(value/categoryMax*100).toFixed(1)+'%;background:var(--blue);border-radius:8px"></div></div></div>').join(''):'<div class="small">Seçilen ay için harcama kaydı yok.</div>';
+  const categorySum=categoryRows.reduce((sum,x)=>sum+x[1],0);
+  const categoryColors=['#3568e8','#e05a5a','#e5a23b','#159b79','#8b65c7','#d66aa6','#5b9fae','#8492a6','#a2a34a'];
+  let angle=0;
+  const pieStops=categoryRows.map(([name,value],i)=>{const start=angle;angle+=categorySum?value/categorySum*360:0;return categoryColors[i%categoryColors.length]+' '+start.toFixed(2)+'deg '+angle.toFixed(2)+'deg';});
+  const pie=document.getElementById('categoryPie');
+  if(pie)pie.style.background=categoryRows.length?'conic-gradient('+pieStops.join(',')+')':'var(--line)';
+  const pieTotal=document.getElementById('categoryPieTotal');
+  if(pieTotal)pieTotal.textContent=money(categorySum);
+  document.getElementById('spendingCategories').innerHTML=categoryRows.length?categoryRows.map(([name,value],i)=>'<div class="row" style="margin:11px 0"><span style="display:flex;align-items:center;gap:8px"><i style="display:inline-block;width:11px;height:11px;border-radius:3px;background:'+categoryColors[i%categoryColors.length]+'"></i>'+esc(name)+'</span><span style="text-align:right"><b>'+money(value)+'</b><span class="small"> · '+(categorySum?value/categorySum*100:0).toFixed(1)+'%</span></span></div>').join(''):'<div class="small">Seçilen ay için harcama kaydı yok.</div>';
   const list=document.getElementById('spendingList');
   const items=[...data.spendings].filter(x=>x.date&&x.date.slice(0,7)===month).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   list.innerHTML=items.length?items.map(x=>'<div class="card"><div class="row"><div><b>'+esc(x.name)+'</b> <span class="badge badge-fixed">'+esc(x.category)+'</span><div class="small">'+esc(x.date||'Tarih yok')+(x.note?' · '+esc(x.note):'')+'</div></div><div class="amount red">−'+money(x.amount)+'</div></div><div class="row" style="margin-top:10px"><span class="small">Seçilen ay</span><div style="display:flex;gap:6px"><button class="ghost" onclick="editSpending(\''+x.id+'\')">Düzenle</button><button class="danger" onclick="deleteSpending(\''+x.id+'\')">Sil</button></div></div></div>').join(''):'<div class="card empty">Seçilen ay için günlük harcama kaydı yok.</div>';
