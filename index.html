@@ -109,7 +109,14 @@ canvas{width:100%!important;height:100%!important}
   <div class="list" id="spendingList"></div>
   <div class="section"><h2>Harcama Kategorileri</h2></div><div class="card" id="spendingCategories"><div class="small">Henüz harcama verisi yok.</div></div>
   <div class="section"><h2>Aylık Bütçe Özeti</h2></div>
-  <div class="card"><div class="row"><span>Gelir (düzenli + kayıtlı)</span><b id="reportIncome" class="green">₺0,00</b></div><div class="row"><span>Sabit giderler</span><b id="reportFixed" class="purple">₺0,00</b></div><div class="row"><span>Günlük harcamalar</span><b id="reportSpending" class="red">₺0,00</b></div><div class="row"><span>Borç ödemeleri</span><b id="reportDebt" class="red">₺0,00</b></div><hr><div class="row"><b>Ay sonu kalan</b><b id="reportBalance">₺0,00</b></div></div>
+  <div class="card">
+    <div class="field"><label for="reportMonth">Raporlanacak ay</label><input id="reportMonth" type="month" onchange="renderSpendings()"></div>
+    <div class="row"><span>Gelir (düzenli + kayıtlı)</span><b id="reportIncome" class="green">₺0,00</b></div>
+    <div class="row"><span>Sabit giderler</span><b id="reportFixed" class="purple">₺0,00</b></div>
+    <div class="row"><span>Günlük harcamalar</span><b id="reportSpending" class="red">₺0,00</b></div>
+    <div class="row"><span>Borç ödemeleri</span><b id="reportDebt" class="red">₺0,00</b></div>
+    <hr><div class="row"><b>Ay sonu kalan</b><b id="reportBalance">₺0,00</b></div>
+  </div>
 </section>
 
 <section id="calc" class="view">
@@ -424,20 +431,20 @@ function monthlySpending(month=today().slice(0,7)){
   return data.spendings.filter(x=>x.date&&x.date.slice(0,7)===month).reduce((sum,x)=>sum+(Number(x.amount)||0),0);
 }
 function renderSpendings(){
-  const month=today().slice(0,7);
+  const monthInput=document.getElementById('reportMonth');
+  if(monthInput&&!monthInput.value)monthInput.value=today().slice(0,7);
+  const month=monthInput&&monthInput.value?monthInput.value:today().slice(0,7);
   document.getElementById('spendingMonthTotal').textContent=money(monthlySpending(month));
   const categoryTotals={};
   data.spendings.filter(x=>x.date&&x.date.slice(0,7)===month).forEach(x=>{const key=x.category||'Diğer';categoryTotals[key]=(categoryTotals[key]||0)+(Number(x.amount)||0)});
   const categoryRows=Object.entries(categoryTotals).sort((a,b)=>b[1]-a[1]);
   const categoryMax=Math.max(1,...categoryRows.map(x=>x[1]));
-  document.getElementById('spendingCategories').innerHTML=categoryRows.length?categoryRows.map(([name,value])=>`<div style="margin:10px 0"><div class="row"><span>${esc(name)}</span><b>${money(value)}</b></div><div style="height:7px;background:var(--line);border-radius:8px;overflow:hidden"><div style="height:100%;width:${(value/categoryMax*100).toFixed(1)}%;background:var(--blue);border-radius:8px"></div></div></div>`).join(''):'<div class="small">Bu ay henüz harcama kaydı yok.</div>';
+  document.getElementById('spendingCategories').innerHTML=categoryRows.length?categoryRows.map(([name,value])=>'<div style="margin:10px 0"><div class="row"><span>'+esc(name)+'</span><b>'+money(value)+'</b></div><div style="height:7px;background:var(--line);border-radius:8px;overflow:hidden"><div style="height:100%;width:'+(value/categoryMax*100).toFixed(1)+'%;background:var(--blue);border-radius:8px"></div></div></div>').join(''):'<div class="small">Seçilen ay için harcama kaydı yok.</div>';
   const list=document.getElementById('spendingList');
   const items=[...data.spendings].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  list.innerHTML=items.length?items.map(x=>`
-    <div class="card"><div class="row"><div><b>${esc(x.name)}</b> <span class="badge badge-fixed">${esc(x.category)}</span><div class="small">${esc(x.date||'Tarih yok')}${x.note?' · '+esc(x.note):''}</div></div><div class="amount red">−${money(x.amount)}</div></div>
-    <div class="row" style="margin-top:10px"><span class="small">${x.date&&x.date.slice(0,7)===month?'Bu ay':'Diğer ay'}</span><div style="display:flex;gap:6px"><button class="ghost" onclick="editSpending('${x.id}')">Düzenle</button><button class="danger" onclick="deleteSpending('${x.id}')">Sil</button></div></div></div>`).join(''):'<div class="card empty">Henüz günlük harcama kaydı yok.</div>';
+  list.innerHTML=items.length?items.map(x=>'<div class="card"><div class="row"><div><b>'+esc(x.name)+'</b> <span class="badge badge-fixed">'+esc(x.category)+'</span><div class="small">'+esc(x.date||'Tarih yok')+(x.note?' · '+esc(x.note):'')+'</div></div><div class="amount red">−'+money(x.amount)+'</div></div><div class="row" style="margin-top:10px"><span class="small">'+(x.date&&x.date.slice(0,7)===month?'Seçilen ay':'Diğer ay')+'</span><div style="display:flex;gap:6px"><button class="ghost" onclick="editSpending(\''+x.id+'\')">Düzenle</button><button class="danger" onclick="deleteSpending(\''+x.id+'\')">Sil</button></div></div></div>').join(''):'<div class="card empty">Henüz günlük harcama kaydı yok.</div>';
   const income=(Number(data.income)||0)+monthlyIncome(month);
-  const fixed=data.expenses.reduce((sum,x)=>sum+(Number(x.amount)||0),0);
+  const fixed=(data.expenses||[]).reduce((sum,x)=>sum+(Number(x.amount)||0),0);
   const spending=monthlySpending(month);
   const debt=data.payments.filter(x=>x.date&&x.date.slice(0,7)===month).reduce((sum,x)=>sum+(Number(x.amount)||0),0);
   const balance=income-fixed-spending-debt;
@@ -448,7 +455,6 @@ function renderSpendings(){
   const balanceEl=document.getElementById('reportBalance');
   balanceEl.textContent=money(balance);balanceEl.style.color=balance>=0?'#059669':'#dc2626';
 }
-
 function saveIncome(){
   data.income = Number(document.getElementById('incomeInput').value) || 0;
   save();
