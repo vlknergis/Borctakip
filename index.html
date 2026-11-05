@@ -1142,8 +1142,13 @@ function renderPlan(){
 
  el.innerHTML=`
   <p><b>Tahmini borçsuz kalma süresi: ${month>=MAX_MONTHS?'600+':month+' ay'}</b></p>
-  <p>Başlangıç borcu: <b>${money(initialDebtTotal)}</b></p>
-  <p class="small">Simülasyondaki toplam faiz: <b class="red">${money(totalInterest)}</b></p>
+  <div class="card" style="margin:10px 0;background:#f8fafc">
+   <div class="small">Tahmini borçsuz kalacağın ay</div>
+   <div style="font-size:22px;font-weight:900;margin:4px 0 10px">${month>=MAX_MONTHS?'600 aydan uzun':(()=>{const date=new Date();date.setMonth(date.getMonth()+month);return date.toLocaleDateString('tr-TR',{month:'long',year:'numeric'});})()}</div>
+   <div class="row"><span>Toplam geri ödeme</span><b>${money(initialDebtTotal+totalInterest)}</b></div>
+   <div class="row"><span>Başlangıç borcu</span><b>${money(initialDebtTotal)}</b></div>
+   <div class="row"><span>Tahmini toplam faiz</span><b class="red">${money(totalInterest)}</b></div>
+  </div>
   <p class="small">Aylık asgari/taksit toplamı: <b>${money(requiredMinimum)}</b></p>
   ${warning?'<p class="small red">⚠️ '+esc(warning)+'</p>':''}
   <p class="small">Hesap; girilen aylık faiz oranının sabit kaldığını, her ay ödeme öncesi uygulandığını ve ek masraf/vergi olmadığını varsayar. Bankanın kesin ödeme planı değildir.</p>
