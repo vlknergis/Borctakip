@@ -900,7 +900,7 @@ async function sendFeedback(){
     if(sessionError)throw sessionError;
     if(!session){if(status)status.textContent='Öneri göndermek için önce hesabına giriş yapmalısın.';return;}
     if(status)status.textContent='Önerin güvenli şekilde gönderiliyor…';
-    const {data,error}=await cloudClient.functions.invoke('send-feedback',{body:{message}});
+    const {data,error}=await cloudClient.functions.invoke('Send-feedback',{body:{message}});
     if(error)throw error;
     if(!data?.success)throw new Error(data?.error||'Mesaj gönderilemedi.');
     input.value='';
