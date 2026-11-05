@@ -245,7 +245,7 @@ canvas{width:100%!important;height:100%!important}
     <button class="primary" onclick="backup()">Tüm Verileri Yedekle</button>
     <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
     <b>Yedekten Geri Yükle</b>
-    <p class="small">Bu işlem mevcut kayıtların yerine yedekteki kayıtları koyar. Geri yükleme öncesinde mevcut verilerin için ayrıca yedek indirilir.</p>
+    <p class="small">Bu işlem mevcut kayıtların yerine yedekteki kayıtları koyar. Önce mevcut verilerin uygulama içinde güvenlik kopyasına alınır. Yedek tarihini ve kayıt sayısını onaylamadan işlem başlamaz.</p>
     <input type="file" id="restoreFile" accept=".json,application/json" onchange="restore(event)">
     <div class="small" id="backupStatus" style="margin-top:10px"></div>
     <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
@@ -1162,63 +1162,69 @@ function savePayment(e){
   closePay();save();
 }
 
-function backup(){
-  try{
-    const payload={app:'Borctakip',version:2,exportedAt:new Date().toISOString(),data:JSON.parse(JSON.stringify(data))};
-    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
-    const url=URL.createObjectURL(blob),a=document.createElement('a');
-    a.href=url;
-    a.download='borctakip-yedek-'+today()+'.json';
-    document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),1500);
-    const status=document.getElementById('backupStatus');
-    if(status)status.textContent='Yedek dosyası oluşturuldu. İndirilenler klasörünü kontrol et.';
-    return true;
-  }catch(error){
-    alert('Yedek oluşturulamadı. Cihazında yeterli alan olduğundan emin ol.');
-    return false;
-  }
+function backupRecordCount(source){
+ const keys=['debts','payments','expenses','expensePayments','incomes','spendings'];
+ return keys.reduce((sum,key)=>sum+(Array.isArray(source[key])?source[key].length:0),0);
 }
-
+function backup(){
+ try{
+  const snapshot=JSON.parse(JSON.stringify(data));
+  const payload={app:'Borctakip',version:2,exportedAt:new Date().toISOString(),recordCount:backupRecordCount(snapshot),data:snapshot};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='borctakip-yedek-'+today()+'.json';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+  const status=document.getElementById('backupStatus');
+  if(status)status.textContent='Yedek indirme işlemi başlatıldı · '+payload.recordCount+' kayıt · '+new Date(payload.exportedAt).toLocaleString('tr-TR')+'. İndirilenler klasörünü kontrol et.';
+  return true;
+ }catch(error){
+  const status=document.getElementById('backupStatus');if(status)status.textContent='Yedek oluşturulamadı: '+(error.message||'Bilinmeyen hata');
+  alert('Yedek oluşturulamadı. Cihazında yeterli alan olduğundan emin ol.');return false;
+ }
+}
 function restore(e){
-  const file=e.target.files&&e.target.files[0];
-  if(!file)return;
-  if(file.size>10*1024*1024){alert('Yedek dosyası 10 MB sınırını aşıyor.');e.target.value='';return;}
-  const reader=new FileReader();
-  reader.onload=()=>{
-    try{
-      const parsed=JSON.parse(reader.result);
-      if(parsed.app&&parsed.app!=='Borctakip')throw new Error('Bu dosya BorçTakip yedeği değil.');
-      if(parsed.version&&Number(parsed.version)>2)throw new Error('Bu yedek daha yeni bir uygulama sürümüne ait.');
-      const restored=parsed.app==='Borctakip'?parsed.data:parsed;
-      if(!restored||!Array.isArray(restored.debts)||!Array.isArray(restored.payments))throw new Error('Yedek yapısı geçersiz.');
-      const listKeys=['debts','payments','expenses','expensePayments','incomes','spendings'];
-      for(const key of listKeys){
-        if(restored[key]!==undefined&&(!Array.isArray(restored[key])||!restored[key].every(item=>item&&typeof item==='object'&&!Array.isArray(item))))throw new Error('Yedekte '+key+' listesi hatalı.');
-      }
-      for(const key of listKeys){
-        (restored[key]||[]).forEach(item=>{
-          if(item.amount!==undefined&&(!Number.isFinite(Number(item.amount))||Number(item.amount)<0))throw new Error('Yedekte geçersiz tutar bulundu.');
-        });
-      }
-      if(restored.income!==undefined&&!Number.isFinite(Number(restored.income)))throw new Error('Gelir bilgisi geçersiz.');
-      if(!confirm('Yedek doğrulandı. Mevcut kayıtların yerine bu dosyadaki kayıtlar yüklensin mi? Mevcut kayıtların için önce ayrıca yedek indirilecek.'))return;
-      if(!backup())throw new Error('Mevcut kayıtlar için güvenlik yedeği oluşturulamadı; geri yükleme iptal edildi.');
-      const clean={...restored};
-      listKeys.forEach(key=>{if(!Array.isArray(clean[key]))clean[key]=[];});
-      if(!Number.isFinite(Number(clean.income)))clean.income=0;
-      if(typeof clean.phone!=='string')clean.phone='';
-      data=clean;
-      save();
-      alert('Yedek başarıyla geri yüklendi.');
-    }catch(error){
-      alert(error.message||'Geçersiz yedek dosyası. Mevcut kayıtların değiştirilmedi.');
-    }finally{
-      e.target.value='';
-    }
-  };
-  reader.onerror=()=>{alert('Yedek dosyası okunamadı.');e.target.value='';};
-  reader.readAsText(file);
+ const file=e.target.files&&e.target.files[0];if(!file)return;
+ if(file.size>10*1024*1024){alert('Yedek dosyası 10 MB sınırını aşıyor.');e.target.value='';return;}
+ const reader=new FileReader();
+ reader.onload=()=>{
+  try{
+   const parsed=JSON.parse(reader.result);
+   if(parsed.app&&parsed.app!=='Borctakip')throw new Error('Bu dosya BorçTakip yedeği değil.');
+   if(parsed.version&&Number(parsed.version)>2)throw new Error('Bu yedek daha yeni bir uygulama sürümüne ait.');
+   const restored=parsed.app==='Borctakip'?parsed.data:parsed;
+   if(!restored||!Array.isArray(restored.debts)||!Array.isArray(restored.payments))throw new Error('Yedek yapısı geçersiz.');
+   const listKeys=['debts','payments','expenses','expensePayments','incomes','spendings'];
+   for(const key of listKeys){
+    if(restored[key]!==undefined&&(!Array.isArray(restored[key])||!restored[key].every(item=>item&&typeof item==='object'&&!Array.isArray(item))))throw new Error('Yedekte '+key+' listesi hatalı.');
+   }
+   for(const key of listKeys)(restored[key]||[]).forEach(item=>{
+    if(item.amount!==undefined&&(!Number.isFinite(Number(item.amount))||Number(item.amount)<0))throw new Error('Yedekte geçersiz tutar bulundu.');
+   });
+   if(restored.income!==undefined&&!Number.isFinite(Number(restored.income)))throw new Error('Gelir bilgisi geçersiz.');
+   const incomingCount=backupRecordCount(restored);
+   const backupDate=parsed.exportedAt?new Date(parsed.exportedAt):null;
+   const dateText=backupDate&&!Number.isNaN(backupDate.getTime())?backupDate.toLocaleString('tr-TR'):'Tarih bilgisi yok (eski yedek)';
+   if(!confirm('Yedek doğrulandı.\nYedek tarihi: '+dateText+'\nKayıt sayısı: '+incomingCount+'\n\nMevcut kayıtların yerine bu yedek yüklensin mi? Önce mevcut veriler uygulama içinde güvenlik kopyasına alınacak.'))return;
+   const oldData=JSON.parse(JSON.stringify(data));
+   const safetyPayload={app:'Borctakip',version:2,exportedAt:new Date().toISOString(),recordCount:backupRecordCount(oldData),data:oldData};
+   try{localStorage.setItem('borctakip_pre_restore_backup',JSON.stringify(safetyPayload));}
+   catch(storageError){throw new Error('Güvenlik kopyası telefona kaydedilemedi. Yer açıp tekrar dene; mevcut kayıtlar korunuyor.');}
+   const clean={...restored};
+   listKeys.forEach(key=>{if(!Array.isArray(clean[key]))clean[key]=[];});
+   if(!Number.isFinite(Number(clean.income)))clean.income=0;
+   if(typeof clean.phone!=='string')clean.phone='';
+   data=clean;
+   try{save();}
+   catch(saveError){data=oldData;throw new Error('Geri yükleme kaydedilemedi. Eski kayıtlar bellekte korundu; uygulamayı kapatmadan tekrar dene.');}
+   const status=document.getElementById('backupStatus');
+   if(status)status.textContent='Geri yükleme tamamlandı · '+incomingCount+' kayıt. Önceki verilerin güvenlik kopyası uygulama içinde saklandı.';
+   alert('Yedek başarıyla geri yüklendi. Önceki verilerin güvenlik kopyası da telefona kaydedildi.');
+  }catch(error){alert(error.message||'Geçersiz yedek dosyası. Mevcut kayıtların değiştirilmedi.');}
+  finally{e.target.value='';}
+ };
+ reader.onerror=()=>{alert('Yedek dosyası okunamadı.');e.target.value='';};
+ reader.readAsText(file);
 }
 
 function clearAll(){
