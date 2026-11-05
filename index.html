@@ -765,22 +765,26 @@ function calendarEvents(month){
 }
 function renderCalendar(){
  const m=document.getElementById('calMonth').value||today().slice(0,7),now=today(),all=calendarEvents(m);
- const overdue=data.debts.filter(d=>d.due&&d.due<now&&remaining(d)>0).map(d=>({id:d.id,date:d.due,name:d.name,amt:Math.min(remaining(d),d.installment||remaining(d))}));
+ const overdueDebts=data.debts.filter(d=>d.due&&d.due<now&&remaining(d)>0).map(d=>({id:d.id,date:d.due,name:d.name,amt:Math.min(remaining(d),d.installment||remaining(d)),isDebt:true}));
+ const overdueBills=data.expenses.map(e=>({id:e.id,date:monthlyExpenseDate(now.slice(0,7),e.day),name:e.name,amt:Number(e.amount)||0,isDebt:false,paid:expensePaid(e.id,now.slice(0,7))})).filter(e=>e.date<now&&!e.paid);
+ const overdue=[...overdueDebts,...overdueBills].sort((a,b)=>a.date.localeCompare(b.date));
  const end=addDays(now,7),next=[];
- [now.slice(0,7),end.slice(0,7)].filter((v,i,a)=>a.indexOf(v)===i).forEach(month=>calendarEvents(month).forEach(item=>{if(item.date>=now&&item.date<=end)next.push(item)}));
+ [now.slice(0,7),end.slice(0,7)].filter((v,i,a)=>a.indexOf(v)===i).forEach(month=>calendarEvents(month).forEach(item=>{if(item.date>=now&&item.date<=end&&(!item.paid||item.isDebt))next.push(item)}));
  const alerts=document.getElementById('calendarAlerts');
  if(alerts){
-  const overdueHtml=overdue.length?overdue.map(d=>'<div class="history-item"><span><b class="red">'+esc(d.name)+'</b><br><span class="small">Geciken borç · Vade: '+d.date+'</span></span><span><b class="red">'+money(d.amt)+'</b><br><button class="ghost" onclick="openPay(\''+d.id+'\')">Ödeme gir</button></span></div>').join(''):'<div class="small green">Gecikmiş borç kaydı görünmüyor.</div>';
+  const overdueHtml=overdue.length?overdue.map(d=>'<div class="history-item"><span><b class="red">'+esc(d.name)+'</b><br><span class="small">Geciken '+(d.isDebt?'borç':'fatura')+' · Vade: '+d.date+'</span></span><span><b class="red">'+money(d.amt)+'</b><br>'+(d.isDebt?'<button class="ghost" onclick="openPay(\''+d.id+'\')">Ödeme gir</button>':'<button class="ghost" onclick="toggleExpensePaid(\''+d.id+'\',\''+now.slice(0,7)+'\')">Ödendi işaretle</button>')+'</span></div>').join(''):'<div class="small green">Gecikmiş borç veya fatura görünmüyor.</div>';
   const nextHtml=next.length?next.map(d=>'<div class="history-item"><span><b>'+esc(d.name)+'</b><br><span class="small">'+(d.isDebt?'Borç ödemesi':'Sabit gider')+' · '+d.date+'</span></span><span><b>'+money(d.amt)+'</b><br>'+(d.isDebt?'<button class="ghost" onclick="openPay(\''+d.id+'\')">Ödeme gir</button>':'<button class="ghost" onclick="toggleExpensePaid(\''+d.id+'\',\''+d.date.slice(0,7)+'\')">'+(d.paid?'Ödendi ✓':'Ödendi işaretle')+'</button>')+'</span></div>').join(''):'<div class="small">Önümüzdeki 7 gün içinde kayıtlı vade bulunmuyor.</div>';
   alerts.innerHTML='<b class="small">Geciken borçlar</b>'+overdueHtml+'<div style="height:12px"></div><b class="small">Önümüzdeki 7 gün</b>'+nextHtml+'<p class="small">Faturalar için ödendi işaretini buradan değiştirebilirsin. Borçlarda gerçek ödeme kaydı için Ödeme gir düğmesini kullan.</p>';
  }
- const debtTotal=all.filter(d=>d.isDebt).reduce((s,d)=>s+d.amt,0);
- const expenseTotal=all.filter(d=>!d.isDebt).reduce((s,d)=>s+d.amt,0);
+ const debtItems=all.filter(d=>d.isDebt),expenseItems=all.filter(d=>!d.isDebt);
+ const debtTotal=debtItems.reduce((s,d)=>s+d.amt,0),expenseTotal=expenseItems.reduce((s,d)=>s+d.amt,0);
+ const paidExpenseTotal=expenseItems.filter(d=>d.paid).reduce((s,d)=>s+d.amt,0);
+ const unpaidTotal=debtTotal+expenseTotal-paidExpenseTotal;
  const dayGroups={};
  all.forEach(item=>{(dayGroups[item.date]||(dayGroups[item.date]=[])).push(item)});
  const summary=document.getElementById('calendarSummary');
  if(summary){
-  summary.innerHTML='<div class="row"><span>Seçilen ay toplamı</span><b>'+money(debtTotal+expenseTotal)+'</b></div><div class="row" style="margin-top:8px"><span class="small">Borç ödemeleri ('+all.filter(d=>d.isDebt).length+')</span><b class="red">'+money(debtTotal)+'</b></div><div class="row" style="margin-top:6px"><span class="small">Sabit giderler ('+all.filter(d=>!d.isDebt).length+')</span><b>'+money(expenseTotal)+'</b></div><div class="row" style="margin-top:6px"><span class="small">Ödeme/vade günü</span><b>'+Object.keys(dayGroups).length+' gün</b></div>';
+  summary.innerHTML='<div class="row"><span>Seçilen ay toplam ödeme yükü</span><b>'+money(debtTotal+expenseTotal)+'</b></div><div class="row" style="margin-top:8px"><span class="small">Borç ödemeleri</span><b class="red">'+money(debtTotal)+'</b></div><div class="row" style="margin-top:6px"><span class="small">Sabit gider toplamı</span><b>'+money(expenseTotal)+'</b></div><div class="row" style="margin-top:6px"><span class="small">Ödenmiş faturalar</span><b class="green">'+money(paidExpenseTotal)+'</b></div><div class="row" style="margin-top:6px"><span class="small">Ödenmemiş toplam yük</span><b class="red">'+money(unpaidTotal)+'</b></div><div class="row" style="margin-top:6px"><span class="small">Ödeme/vade günü</span><b>'+Object.keys(dayGroups).length+' gün</b></div>';
  }
  document.getElementById('calendarList').innerHTML=all.length?Object.keys(dayGroups).sort().map(date=>{
   const items=dayGroups[date],daily=items.reduce((s,d)=>s+d.amt,0);
