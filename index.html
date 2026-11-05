@@ -75,13 +75,18 @@ canvas{width:100%!important;height:100%!important}
   <div class="section"><h2>Son İşlemler</h2><span class="small">Ödeme Geçmişi</span></div>
   <div class="card" id="recent"></div>
   
-  <!-- Otomatik Kur Bandı -->
-  <div class="section"><h2>Piyasa Durumu <span class="small">(Gecikmeli Kur)</span></h2></div>
+  <!-- Canlı piyasa verileri -->
+  <div class="section">
+    <h2>Piyasa Durumu <span class="small">Canlı veri</span></h2>
+    <button class="ghost" onclick="fetchMarketRates()">Yenile</button>
+  </div>
   <div class="ticker-bar" id="tickerBar">
     <div class="ticker-item"><span class="ticker-title">USD / TRY</span><span class="ticker-val" id="usdRate">Yükleniyor...</span></div>
     <div class="ticker-item"><span class="ticker-title">EUR / TRY</span><span class="ticker-val" id="eurRate">Yükleniyor...</span></div>
     <div class="ticker-item"><span class="ticker-title">GRAM ALTIN</span><span class="ticker-val" id="goldRate">Yükleniyor...</span></div>
   </div>
+  <div class="small" id="marketUpdated" style="margin:-5px 2px 12px">Döviz ve altın verileri alınıyor...</div>
+  <div class="small" style="margin:-6px 2px 12px">Altın: spot piyasa gram karşılığıdır; kuyumcu alış/satış fiyatı ve işçilik içermez. Kaynak: <a href="https://gold-api.com/" target="_blank" rel="noopener">Gold API</a>.</div>
 
   <p class="notice">Verileriniz cihazınızda saklanır (`borctakip_v2`). Eski kayıtlarınız (`borctakip_v1`) geçiş sırasında silinmez. Düzenli yedek almayı unutmayın.</p>
 </section>
@@ -200,16 +205,20 @@ canvas{width:100%!important;height:100%!important}
       <label><b>Geliştirici WhatsApp Numarası</b></label>
       <input id="phoneInput" type="tel" placeholder="Örn. 905551112233" onchange="savePhone()">
     </div>
+  </div>
+  <div class="card">
+    <b>Yedekleme Merkezi</b>
+    <p class="small">Borç, ödeme geçmişi, gelir, sabit gider ve günlük harcamaların tek JSON dosyasına kaydedilir. Dosyayı telefonuna veya güvenli bir bulut klasörüne sakla. Kayıtlar otomatik olarak sunucuya gönderilmez.</p>
+    <button class="primary" onclick="backup()">Tüm Verileri Yedekle</button>
     <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
-    <p><b>Verilerini Yedekle</b><br><span class="small">Tüm kayıtları JSON dosyası olarak indir.</span></p>
-    <button class="primary" onclick="backup()">Yedek İndir</button>
-    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
-    <p><b>Yedekten Geri Yükle</b><br><span class="small">Daha önce indirdiğin yedeği seç.</span></p>
+    <b>Yedekten Geri Yükle</b>
+    <p class="small">Bu işlem mevcut kayıtların yerine yedekteki kayıtları koyar. Geri yükleme öncesinde mevcut verilerin için ayrıca yedek indirilir.</p>
     <input type="file" id="restoreFile" accept=".json,application/json" onchange="restore(event)">
+    <div class="small" id="backupStatus" style="margin-top:10px"></div>
     <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
     <button class="danger" onclick="clearAll()">Tüm Verileri Sil</button>
   </div>
-</section>
+</section></section>
 </main>
 
 <nav>
@@ -450,39 +459,68 @@ function savePhone(){
   save();
 }
 
-/* OTOMATİK KUR ÇEKME MOTORU */
+/* CANLI DÖVİZ VE ALTIN VERİLERİ */
+function formatMarketTime(value){
+  if(!value)return 'Zaman bilgisi yok';
+  const date=new Date(value);
+  if(!Number.isFinite(date.getTime()))return 'Zaman bilgisi yok';
+  return date.toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
 async function fetchMarketRates(){
-  try {
-    let res = await fetch('https://open.er-api.com/v6/latest/USD');
-    let d = await res.json();
-    if(d && d.rates && d.rates.TRY){
-      let usdTry = d.rates.TRY;
-      let eurTry = usdTry / d.rates.EUR;
-      
-      document.getElementById('usdRate').textContent = usdTry.toFixed(3) + ' ₺';
-      document.getElementById('eurRate').textContent = eurTry.toFixed(3) + ' ₺';
-      document.getElementById('goldRate').textContent = 'Kaynak gerekli';
-      return;
+  const status=document.getElementById('marketUpdated');
+  const usdEl=document.getElementById('usdRate');
+  const eurEl=document.getElementById('eurRate');
+  const goldEl=document.getElementById('goldRate');
+  if(status)status.textContent='Piyasa verileri güncelleniyor...';
+  const fxPromise=(async()=>{
+    let response=await fetch('https://open.er-api.com/v6/latest/USD');
+    if(!response.ok)throw new Error('Birincil döviz kaynağı yanıt vermedi');
+    let fx=await response.json();
+    if(fx.result!=='success'||!Number.isFinite(Number(fx.rates?.TRY))||!Number.isFinite(Number(fx.rates?.EUR)))throw new Error('Döviz verisi geçersiz');
+    return {usd:Number(fx.rates.TRY),eur:Number(fx.rates.TRY)/Number(fx.rates.EUR),time:fx.time_last_update_utc,source:'ExchangeRate-API'};
+  })().catch(async()=>{
+    const response=await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+    if(!response.ok)throw new Error('Döviz kaynaklarına ulaşılamadı');
+    const fx=await response.json();
+    if(!Number.isFinite(Number(fx.rates?.TRY))||!Number.isFinite(Number(fx.rates?.EUR)))throw new Error('Yedek döviz verisi geçersiz');
+    return {usd:Number(fx.rates.TRY),eur:Number(fx.rates.TRY)/Number(fx.rates.EUR),time:new Date().toISOString(),source:'ExchangeRate-API yedek'};
+  });
+  const goldPromise=(async()=>{
+    try{
+      const response=await fetch('https://api.gold-api.com/price/XAU/TRY');
+      if(!response.ok)throw new Error('Gold API yanıt vermedi');
+      const quote=await response.json();
+      if(!Number.isFinite(Number(quote.price))||Number(quote.price)<=0)throw new Error('Altın verisi geçersiz');
+      return {gram:Number(quote.price)/31.1035,time:quote.updatedAt,source:'Gold API'};
+    }catch(primaryError){
+      const response=await fetch('https://xaus.com/api/v1/spot?currency=TRY&unit=gram&compact=1');
+      if(!response.ok)throw new Error('Altın kaynaklarına ulaşılamadı');
+      const quote=await response.json();
+      const price=Number(quote.xau?.price);
+      if(!Number.isFinite(price)||price<=0||quote.data_state?.status==='unavailable')throw new Error('Yedek altın verisi geçersiz');
+      return {gram:price,time:quote.updated_at,source:'XAUS yedek',stale:quote.data_state?.status==='stale'};
     }
-    throw new Error();
-  } catch(e){
-    // Alternatif yedek servis
-    try {
-      let res2 = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-      let d2 = await res2.json();
-      let usd = d2.rates.TRY;
-      let eur = usd / d2.rates.EUR;
-
-      document.getElementById('usdRate').textContent = usd.toFixed(3) + ' ₺';
-      document.getElementById('eurRate').textContent = eur.toFixed(3) + ' ₺';
-      document.getElementById('goldRate').textContent = 'Kaynak gerekli';
-    } catch(err){
-      // Bağlantı yoksa tahmini veya sabit fiyat gösterme.
-      document.getElementById('usdRate').textContent = 'Bağlantı yok';
-      document.getElementById('eurRate').textContent = 'Bağlantı yok';
-      document.getElementById('goldRate').textContent = 'Veri yok';
-    }
+  })();
+  const [fxResult,goldResult]=await Promise.allSettled([fxPromise,goldPromise]);
+  const updateTimes=[];
+  if(fxResult.status==='fulfilled'){
+    const fx=fxResult.value;
+    usdEl.textContent=fx.usd.toLocaleString('tr-TR',{minimumFractionDigits:3,maximumFractionDigits:3})+' ₺';
+    eurEl.textContent=fx.eur.toLocaleString('tr-TR',{minimumFractionDigits:3,maximumFractionDigits:3})+' ₺';
+    updateTimes.push('Döviz '+formatMarketTime(fx.time)+' · '+fx.source);
+  }else{
+    usdEl.textContent='Veri yok';eurEl.textContent='Veri yok';
+    updateTimes.push('Döviz bağlantısı kurulamadı');
   }
+  if(goldResult.status==='fulfilled'){
+    const gold=goldResult.value;
+    goldEl.textContent=gold.gram.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₺';
+    updateTimes.push('Altın '+formatMarketTime(gold.time)+' · '+gold.source+(gold.stale?' (son bilinen veri)':''));
+  }else{
+    goldEl.textContent='Veri yok';
+    updateTimes.push('Altın bağlantısı kurulamadı');
+  }
+  if(status)status.textContent=updateTimes.join('  |  ');
 }
 
 /* HABERLERİ ÇEKME */
@@ -917,33 +955,62 @@ function savePayment(e){
 }
 
 function backup(){
-  let blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='borctakip-yedek-'+today()+'.json';
-  a.click();
-  URL.revokeObjectURL(a.href);
+  try{
+    const payload={app:'Borctakip',version:2,exportedAt:new Date().toISOString(),data:JSON.parse(JSON.stringify(data))};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;
+    a.download='borctakip-yedek-'+today()+'.json';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+    const status=document.getElementById('backupStatus');
+    if(status)status.textContent='Yedek dosyası oluşturuldu. İndirilenler klasörünü kontrol et.';
+    return true;
+  }catch(error){
+    alert('Yedek oluşturulamadı. Cihazında yeterli alan olduğundan emin ol.');
+    return false;
+  }
 }
 
 function restore(e){
-  let f=e.target.files[0];if(!f)return;
-  let r=new FileReader();
-  r.onload=()=>{
+  const file=e.target.files&&e.target.files[0];
+  if(!file)return;
+  if(file.size>10*1024*1024){alert('Yedek dosyası 10 MB sınırını aşıyor.');e.target.value='';return;}
+  const reader=new FileReader();
+  reader.onload=()=>{
     try{
-      let x=JSON.parse(r.result);
-      if(!Array.isArray(x.debts)||!Array.isArray(x.payments))throw 0;
-      if(confirm('Mevcut kayıtların yedek dosyasındaki kayıtlarla değiştirilsin mi?')){
-        if(!Array.isArray(x.expenses))x.expenses=[];
-        if(!Array.isArray(x.incomes))x.incomes=[];
-        if(!Array.isArray(x.spendings))x.spendings=[];
-        if(!Array.isArray(x.debts))x.debts=[];
-        if(!Array.isArray(x.payments))x.payments=[];
-        if(!Number.isFinite(Number(x.income)))x.income=0;
-        data=x;save();alert('Yedek başarıyla geri yüklendi.');
+      const parsed=JSON.parse(reader.result);
+      if(parsed.app&&parsed.app!=='Borctakip')throw new Error('Bu dosya BorçTakip yedeği değil.');
+      if(parsed.version&&Number(parsed.version)>2)throw new Error('Bu yedek daha yeni bir uygulama sürümüne ait.');
+      const restored=parsed.app==='Borctakip'?parsed.data:parsed;
+      if(!restored||!Array.isArray(restored.debts)||!Array.isArray(restored.payments))throw new Error('Yedek yapısı geçersiz.');
+      const listKeys=['debts','payments','expenses','incomes','spendings'];
+      for(const key of listKeys){
+        if(restored[key]!==undefined&&(!Array.isArray(restored[key])||!restored[key].every(item=>item&&typeof item==='object'&&!Array.isArray(item))))throw new Error('Yedekte '+key+' listesi hatalı.');
       }
-    }catch{alert('Geçersiz yedek dosyası.')}
-    e.target.value='';
+      for(const key of listKeys){
+        (restored[key]||[]).forEach(item=>{
+          if(item.amount!==undefined&&(!Number.isFinite(Number(item.amount))||Number(item.amount)<0))throw new Error('Yedekte geçersiz tutar bulundu.');
+        });
+      }
+      if(restored.income!==undefined&&!Number.isFinite(Number(restored.income)))throw new Error('Gelir bilgisi geçersiz.');
+      if(!confirm('Yedek doğrulandı. Mevcut kayıtların yerine bu dosyadaki kayıtlar yüklensin mi? Mevcut kayıtların için önce ayrıca yedek indirilecek.'))return;
+      if(!backup())throw new Error('Mevcut kayıtlar için güvenlik yedeği oluşturulamadı; geri yükleme iptal edildi.');
+      const clean={...restored};
+      listKeys.forEach(key=>{if(!Array.isArray(clean[key]))clean[key]=[];});
+      if(!Number.isFinite(Number(clean.income)))clean.income=0;
+      if(typeof clean.phone!=='string')clean.phone='';
+      data=clean;
+      save();
+      alert('Yedek başarıyla geri yüklendi.');
+    }catch(error){
+      alert(error.message||'Geçersiz yedek dosyası. Mevcut kayıtların değiştirilmedi.');
+    }finally{
+      e.target.value='';
+    }
   };
-  r.readAsText(f);
+  reader.onerror=()=>{alert('Yedek dosyası okunamadı.');e.target.value='';};
+  reader.readAsText(file);
 }
 
 function clearAll(){
@@ -974,6 +1041,7 @@ function checkReminders(){
 document.getElementById('calMonth').value=today().slice(0,7);
 render();
 fetchMarketRates();
+setInterval(fetchMarketRates,60000);
 calculateLoan();
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 checkReminders();
