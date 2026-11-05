@@ -1052,19 +1052,44 @@ function clearAll(){
 function enableReminders(){
  if(!('Notification' in window)){document.getElementById('notifyStatus').textContent='Bu tarayıcı bildirimleri desteklemiyor.';return}
  Notification.requestPermission().then(p=>{
-  document.getElementById('notifyStatus').textContent=p==='granted'?'Bildirim izni verildi. Hatırlatmalar yalnızca uygulama açıkken saat 10:00, 14:00 ve 19:00 civarında kontrol edilir.':'Bildirim izni verilmedi.';
+  document.getElementById('notifyStatus').textContent=p==='granted'?'Bildirim izni verildi. Android’de bildirimler Service Worker üzerinden gösterilir. Kontrol, uygulama açıkken saat 10:00, 14:00 ve 19:00 civarında yapılır; uygulama kapalıyken garanti edilmez.':'Bildirim izni verilmedi.';
   if(p==='granted')checkReminders();
- });
+ }).catch(()=>{document.getElementById('notifyStatus').textContent='Bildirim izni alınamadı. Tarayıcı ayarlarını kontrol et.'});
 }
-function checkReminders(){
- if(!('Notification' in window)||Notification.permission!=='granted')return;
+async function showAppNotification(title,options){
+ if('serviceWorker' in navigator){
+  try{
+   const registration=await navigator.serviceWorker.ready;
+   await registration.showNotification(title,options);
+   return true;
+  }catch(error){}
+ }
+ try{
+  new Notification(title,options);
+  return true;
+ }catch(error){
+  return false;
+ }
+}
+let reminderCheckRunning=false;
+async function checkReminders(){
+ if(reminderCheckRunning||!('Notification' in window)||Notification.permission!=='granted')return;
  const now=new Date(),hour=now.getHours(),minute=now.getMinutes();
  if(![10,14,19].includes(hour)||minute>5)return;
  const key='borctakip_reminder_'+today()+'_'+hour;
  try{if(localStorage.getItem(key))return}catch(error){}
- data.expenses.forEach(e=>{if(monthlyExpenseDate(today().slice(0,7),e.day)===today())new Notification('BorçTakip sabit gider hatırlatması',{body:e.name+' ('+e.category+') için bugün vade günü. Tutar: '+money(e.amount),tag:'expense-'+e.id+'-'+today()})});
- data.debts.forEach(d=>{if(d.due===today()&&remaining(d)>0)new Notification('BorçTakip borç ödeme hatırlatması',{body:d.name+' borcunun vadesi bugün. Kalan borç: '+money(remaining(d)),tag:'debt-'+d.id+'-'+today()})});
- try{localStorage.setItem(key,String(Date.now()))}catch(error){}
+ reminderCheckRunning=true;
+ try{
+  const pending=[];
+  (data.expenses||[]).forEach(e=>{
+   if(monthlyExpenseDate(today().slice(0,7),e.day)===today())pending.push(showAppNotification('BorçTakip sabit gider hatırlatması',{body:e.name+' ('+e.category+') için bugün vade günü. Tutar: '+money(e.amount),tag:'expense-'+e.id+'-'+today()}));
+  });
+  (data.debts||[]).forEach(d=>{
+   if(d.due===today()&&remaining(d)>0)pending.push(showAppNotification('BorçTakip borç ödeme hatırlatması',{body:d.name+' borcunun vadesi bugün. Kalan borç: '+money(remaining(d)),tag:'debt-'+d.id+'-'+today()}));
+  });
+  const results=await Promise.all(pending);
+  if(results.every(Boolean))try{localStorage.setItem(key,String(Date.now()))}catch(error){}
+ }finally{reminderCheckRunning=false}
 }
 
 document.getElementById('calMonth').value=today().slice(0,7);
