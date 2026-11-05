@@ -247,6 +247,7 @@ canvas{width:100%!important;height:100%!important}
     <b>Yedekten Geri Yükle</b>
     <p class="small">Bu işlem mevcut kayıtların yerine yedekteki kayıtları koyar. Önce mevcut verilerin uygulama içinde güvenlik kopyasına alınır. Yedek tarihini ve kayıt sayısını onaylamadan işlem başlamaz.</p>
     <input type="file" id="restoreFile" accept=".json,application/json" onchange="restore(event)">
+    <button class="ghost" style="margin-top:10px" onclick="downloadSafetyBackup()">Geri Yükleme Öncesi Güvenlik Kopyasını İndir</button>
     <div class="small" id="backupStatus" style="margin-top:10px"></div>
     <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
     <button class="danger" onclick="clearAll()">Tüm Verileri Sil</button>
@@ -1225,6 +1226,22 @@ function restore(e){
  };
  reader.onerror=()=>{alert('Yedek dosyası okunamadı.');e.target.value='';};
  reader.readAsText(file);
+}
+
+
+function downloadSafetyBackup(){
+ try{
+  const raw=localStorage.getItem('borctakip_pre_restore_backup');
+  if(!raw){alert('Henüz geri yükleme güvenlik kopyası bulunmuyor.');return;}
+  const payload=JSON.parse(raw);
+  if(payload.app!=='Borctakip'||!payload.data)throw new Error('Güvenlik kopyası geçersiz.');
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='borctakip-onceki-veri-guvenlik-'+today()+'.json';
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
+  const status=document.getElementById('backupStatus');
+  if(status)status.textContent='Geri yükleme öncesi güvenlik kopyasının indirilmesi başlatıldı. Kayıt sayısı: '+(payload.recordCount||backupRecordCount(payload.data))+'.';
+ }catch(error){alert('Güvenlik kopyası indirilemedi: '+(error.message||'Bilinmeyen hata'));}
 }
 
 function clearAll(){
