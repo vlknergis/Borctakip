@@ -213,6 +213,7 @@ canvas{width:100%!important;height:100%!important}
         <option value="rate">Çığ Yöntemi (En Yüksek Faiz Oranından Başla)</option>
       </select>
     </div>
+    <div id="planRateInputs" class="card" style="margin:10px 0;background:#f8fafc"><b>Deneme Amaçlı Faiz Oranları</b><p class="small">Buraya girdiğin aylık oranlar yalnızca bu planın hesabında kullanılır; borç kayıtlarındaki faiz oranlarını değiştirmez.</p><div id="planRateFields"></div></div>
     <div id="planResult" class="small">Borç verilerini ve bütçenizi girdiğinizde simülasyon hesaplanır.</div>
   </div>
 </section>
@@ -1062,17 +1063,20 @@ function renderPlan(){
  const strategy=document.getElementById('strategy').value;
  const el=document.getElementById('planResult');
 
- let debts=data.debts.map(d=>({
+ const activeDebts=data.debts.filter(d=>remaining(d)>0.005);
+ renderPlanRateInputs(activeDebts);
+ let debts=activeDebts.map(d=>({
+   id:d.id,
    name:d.name,
    remain:remaining(d),
-   rate:Math.max(0,Number(d.rate)||0),
+   rate:planRateForDebt(d),
    minPay:Math.max(0,Number(d.installment)||0)
- })).filter(d=>d.remain>0.005);
+ }));
 
  if(!debts.length){el.textContent='Aktif borç bulunmuyor.';return}
  const zeroRateNames=debts.filter(d=>d.rate<=0).map(d=>d.name);
  const zeroRateNote=zeroRateNames.length
-  ? '<p class="small" style="color:#b45309">ℹ️ '+zeroRateNames.map(name=>esc(name)).join(', ')+' için aylık faiz oranı boş veya %0. Hesaplamada bu borçlara faiz eklenmez; gerçek oranı biliyorsan borcu düzenleyip gir.</p>'
+  ? '<p class="small" style="color:#b45309">ℹ️ '+zeroRateNames.map(name=>esc(name)).join(', ')+' için bu plan ekranındaki deneme faiz oranı boş veya %0. Hesaplamada bu borçlara faiz eklenmez.</p>'
   : '';
  if(budget<=0){el.innerHTML='Planı hesaplamak için aylık ödeme bütçesini girin.'+zeroRateNote;return}
 
@@ -1165,8 +1169,20 @@ function renderPlan(){
 }
 
 
+function planRateForDebt(d){
+ const input=document.getElementById('planRate_'+d.id);
+ return Math.max(0,Number(input?input.value:d.rate)||0);
+}
+function renderPlanRateInputs(activeDebts){
+ const wrap=document.getElementById('planRateFields');
+ if(!wrap)return;
+ const signature=JSON.stringify(activeDebts.map(d=>[d.id,d.name,d.rate]));
+ if(wrap.dataset.signature===signature)return;
+ wrap.dataset.signature=signature;
+ wrap.innerHTML=activeDebts.map(d=>'<div class="field"><label for="planRate_'+esc(d.id)+'">'+esc(d.name)+' · Aylık faiz (%)</label><input id="planRate_'+esc(d.id)+'" type="number" min="0" step="0.01" placeholder="Örn. 3.89" value="'+(Number(d.rate)>0?esc(String(d.rate)):'')+'" oninput="renderPlan()"></div>').join('');
+}
 function simulatePlanScenario(budget,strategy){
- const debts=data.debts.map(d=>({remain:remaining(d),rate:Math.max(0,Number(d.rate)||0),minPay:Math.max(0,Number(d.installment)||0)})).filter(d=>d.remain>0.005);
+ const debts=data.debts.map(d=>({remain:remaining(d),rate:planRateForDebt(d),minPay:Math.max(0,Number(d.installment)||0)})).filter(d=>d.remain>0.005);
  const minimum=debts.reduce((s,d)=>s+Math.min(d.remain,d.minPay),0);
  if(!debts.length)return {months:0,interest:0,minimum};
  if(budget+0.005<minimum)return {months:null,interest:null,minimum};
