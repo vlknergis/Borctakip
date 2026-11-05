@@ -1,24 +1,20 @@
-# BorçTakip – Güvenli Bulut Yedekleme Hazırlığı
+# BorçTakip – Supabase Hesap ve Bulut Yedekleme
 
-Bu belge, BorçTakip'in mevcut cihaz içi kayıt sistemini bozmadan Supabase Auth + PostgreSQL + Row Level Security (RLS) ile hesap ve bulut yedekleme altyapısına geçiş planını açıklar.
+Bu belge, `yenileme/borctakip-v3` geliştirme dalındaki mevcut entegrasyonun durumunu ve kurulum kontrollerini açıklar.
 
-## Mevcut durum
+## Mevcut uygulama durumu
 
-- Borç, ödeme, gelir ve gider kayıtları şu anda cihazın localStorage alanında tutulur.
-- Bu dosyadaki SQL kurulmadan ve uygulamaya proje bağlantısı eklenmeden bulut yedekleme çalışmaz.
-- Mevcut cihaz içi kayıt sistemi korunacaktır.
-- Supabase bağlantısı yokken uygulama buluta kayıt yapıyormuş gibi gösterilmemelidir.
+- Supabase JS v2 istemcisi uygulamaya eklenmiştir.
+- E-posta ile kayıt, giriş, çıkış ve şifre sıfırlama arayüzleri eklenmiştir.
+- Kullanıcı oturumu tarayıcıda kalıcı tutulur ve oturum değişiklikleri arayüze yansıtılır.
+- Manuel buluta yedek yükleme ve buluttan geri yükleme işlevleri eklenmiştir.
+- Otomatik arka plan senkronizasyonu **kapalıdır**.
+- Cihaz içi kayıt sistemi ve yerel JSON yedekleme korunur.
+- Kod yalnızca `yenileme/borctakip-v3` dalındadır; canlı Netlify sitesine dağıtıldığı anlamına gelmez.
 
-## 1. Supabase projesi oluşturma
+## 1. Supabase veritabanı şeması
 
-1. https://supabase.com adresinden hesap açıp yeni bir proje oluşturun.
-2. Proje bölgesi olarak Türkiye'ye makul gecikme sunan Avrupa bölgesini seçin.
-3. Güçlü bir veritabanı parolası belirleyin ve güvenli yerde saklayın.
-4. Proje hazır olunca Dashboard > SQL Editor bölümünü açın.
-
-## 2. SQL Editor'de çalıştırılacak şema
-
-Aşağıdaki SQL, her kullanıcı için tek bir güncel yedek satırı oluşturur. RLS politikaları sayesinde oturum açmış kullanıcı yalnızca kendi satırını okuyabilir, ekleyebilir, güncelleyebilir veya silebilir.
+Supabase Dashboard > SQL Editor bölümünde aşağıdaki SQL bir kez çalıştırılmalıdır. Kullanıcı başına tek yedek satırı oluşturur; RLS ile her kullanıcı yalnızca kendi yedeğine erişebilir.
 
 ```sql
 create table if not exists public.user_backups (
@@ -76,46 +72,47 @@ before update on public.user_backups
 for each row execute function public.bump_user_backup_revision();
 ```
 
-## 3. Kimlik doğrulama ayarları
+## 2. Authentication ayarları
 
-1. Authentication > Providers bölümünden Email sağlayıcısını etkin bırakın.
-2. Authentication > URL Configuration bölümüne uygulamanın gerçek HTTPS adresini ekleyin:
-   - Site URL: uygulamanın Netlify adresi.
-   - Redirect URLs: aynı alan adının giriş dönüş adresi.
-3. E-posta doğrulama / OTP ayarlarını kontrol edin.
+Supabase Dashboard > Authentication bölümünde:
 
-## 4. Uygulama bağlantısı için gereken iki değer
+- Sign in / providers > Email: Enabled olmalı.
+- User Signups > Allow new users to sign up: açık olmalı.
+- User Signups > Confirm email: açık bırakılması önerilir.
+- URL Configuration > Site URL:
+  `https://fascinating-begonia-0f571d.netlify.app`
+- URL Configuration > Redirect URLs listesinde şu adres bulunmalı:
+  `https://fascinating-begonia-0f571d.netlify.app/**`
 
-Supabase Dashboard > Project Settings > API bölümünden:
-- Project URL
-- Publishable key (eski arayüzlerde anon/public key)
+Confirm email açıkken yeni kullanıcı, ilk girişten önce e-postasına gelen doğrulama bağlantısına tıklamalıdır. E-posta gelmezse spam klasörü ve Supabase e-posta gönderim ayarları kontrol edilmelidir.
 
-Bu iki değer tarayıcı uygulamasında kullanılmak üzere tasarlanmış herkese açık istemci bilgileridir; yine de RLS mutlaka açık olmalıdır.
+## 3. Tarayıcı istemcisi anahtarları
 
-**Asla paylaşmayın ve index.html içine koymayın:**
+Uygulama Project URL ve Publishable key ile yapılandırılmıştır. Publishable key tarayıcıda kullanılabilen istemci anahtarıdır; erişim güvenliği RLS politikalarına dayanır.
+
+**Asla istemeyin, paylaşmayın veya tarayıcı koduna koymayın:**
 - service_role key / secret key
 - Veritabanı parolası
 - SMTP parolası veya özel erişim anahtarları
 
-Bu sırlar tarayıcıya konursa herkes tarafından alınabilir.
+## 4. Bulut yedekleme güvenliği
 
-## 5. Senkronizasyon güvenliği
+- Bulut işlemleri oturum açmış kullanıcıyla yapılır.
+- Yükleme ve geri yükleme manuel başlatılır; otomatik senkronizasyon etkin değildir.
+- Geri yükleme öncesinde yerel verinin güvenlik kopyası oluşturulur.
+- Geri yüklemede veri yapısı doğrulanır ve kullanıcıdan onay alınır.
+- Revision kontrolü, başka bir cihazdan gelen daha yeni yedeğin sessizce ezilmesini önlemeye yardımcı olur.
+- İnternet veya Supabase bağlantısı yoksa cihaz içi kayıtlar yerel olarak kullanılmaya devam eder.
 
-- İlk sürümde buluta yalnızca kullanıcı oturumu doğrulandıktan sonra erişilmelidir.
-- Kayıt yüklemeden önce mevcut cihaz verisi için güvenlik yedeği alınmalıdır.
-- İndirme sırasında mevcut cihaz verisi otomatik olarak üzerine yazılmamalı; tarih, kayıt sayısı ve kullanıcı onayı gösterilmelidir.
-- Birden fazla cihaz aynı anda kullanılırsa eski yedek yeni veriyi ezebilir. Bu nedenle revision kontrolüyle çakışma tespiti yapılmadan otomatik arka plan eşitlemesi açılmamalıdır.
-- Bulut yedekleme, uygulamanın cihaz içi yedekleme/geri yükleme özelliğinin yerine geçmemelidir.
+## 5. Test sırası
 
-## 6. Kurulum sonrası test listesi
+1. Geliştirme sürümü erişilebilir olduğunda yeni bir e-posta ile hesap oluşturun.
+2. Gelen doğrulama bağlantısına tıklayın; spam klasörünü de kontrol edin.
+3. Uygulamaya aynı e-posta ve şifreyle giriş yapın.
+4. Küçük, deneme amaçlı bir kayıtla manuel bulut yedeklemesini test edin.
+5. Geri yükleme testini yalnızca deneme verisiyle yapın; gerçek kayıtların üzerine yazmadan önce yerel JSON yedeği alın.
+6. İkinci bir hesapla ilk hesabın yedeğine erişilemediğini doğrulayın.
 
-- İki ayrı kullanıcı hesabı birbirinin yedeğini okuyamamalı.
-- Oturum kapatılınca bulut verisi görüntülenememeli.
-- Aynı kullanıcı giriş yaptığında kendi yedeğini görebilmeli.
-- Hatalı veya eski şema sürümü reddedilmeli.
-- Ağ kesilirse cihaz içi kayıt ve JSON yedekleme çalışmaya devam etmeli.
-- Çakışan revision durumunda sessizce üzerine yazmak yerine kullanıcı uyarılmalı.
+## Yayın notu
 
-## Önemli
-
-Bu dosya kurulum tarifidir; tek başına bulut bağlantısını etkinleştirmez. Supabase projesi oluşturulup SQL çalıştırıldıktan ve Project URL + Publishable key uygulamaya güvenli biçimde tanımlandıktan sonra istemci entegrasyonu yapılmalıdır.
+Bu dalda kodun bulunması canlı sitenin güncellendiği anlamına gelmez. Canlı Netlify dağıtımları tekrar mümkün olana ve testler tamamlanana kadar `main` dalına birleştirme veya üretim yayını yapılmamalıdır.
