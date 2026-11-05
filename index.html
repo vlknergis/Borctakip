@@ -500,63 +500,90 @@ function renderPlan(){
  const budget=Number(document.getElementById('monthlyBudget').value)||0;
  const strategy=document.getElementById('strategy').value;
  const el=document.getElementById('planResult');
- 
- let list=data.debts.map(d=>({
-   name: d.name,
-   remain: remaining(d),
-   rate: Number(d.rate)||0,
-   minPay: Number(d.installment)||0
- })).filter(d=>d.remain>0);
 
- if(!list.length){el.textContent='Aktif borç bulunmuyor.';return}
+ let debts=data.debts.map(d=>({
+   name:d.name,
+   remain:remaining(d),
+   rate:Math.max(0,Number(d.rate)||0),
+   minPay:Math.max(0,Number(d.installment)||0)
+ })).filter(d=>d.remain>0.005);
+
+ if(!debts.length){el.textContent='Aktif borç bulunmuyor.';return}
  if(budget<=0){el.textContent='Planı hesaplamak için aylık ödeme bütçesini girin.';return}
- 
- if(strategy==='small') list.sort((a,b)=>a.remain-b.remain);
- else if(strategy==='rate') list.sort((a,b)=>b.rate-a.rate);
 
- let month=0, lines=[], totalInterestAccrued=0;
- let left=list.map(d=>({...d}));
- 
- while(left.some(d=>d.remain>0.01)&&month<360){
-  month++;
-  let cash=budget;
-  let paidNames=[];
+ const priority=(a,b)=>strategy==='rate'
+   ? (b.rate-a.rate || a.remain-b.remain)
+   : (a.remain-b.remain || b.rate-a.rate);
+ debts.sort(priority);
 
-  for(let d of left){
-    if(d.remain>0 && d.rate>0){
-      let interest = d.remain * (d.rate/100);
-      d.remain += interest;
-      totalInterestAccrued += interest;
-    }
-  }
+ const requiredMinimum=debts.reduce((sum,d)=>sum+Math.min(d.remain,d.minPay),0);
+ if(budget+0.005<requiredMinimum){
+   el.innerHTML=`
+    <p><b class="red">Aylık bütçe asgari ödemelere yetmiyor.</b></p>
+    <p>Girilen bütçe: <b>${money(budget)}</b></p>
+    <p>Kaydedilen aylık taksit/asgari toplamı: <b>${money(requiredMinimum)}</b></p>
+    <p class="small">Aylık bütçeyi en az ${money(requiredMinimum)} seviyesine çıkarın veya borçların taksit/asgari tutarlarını kontrol edin. Bu durumda güvenilir borçsuz kalma süresi hesaplanamaz.</p>
+   `;
+   return;
+ }
 
-  for(let d of left){
-    if(d.remain>0 && d.minPay>0 && cash>0){
-      let p = Math.min(cash, d.remain, d.minPay);
-      d.remain -= p;
-      cash -= p;
-      if(p>0) paidNames.push(d.name+': '+money(p));
-    }
-  }
+ let left=debts.map(d=>({...d}));
+ let month=0, totalInterest=0, lines=[], warning='';
+ const MAX_MONTHS=600;
 
-  for(let d of left){
-    if(cash<=0) break;
-    if(d.remain>0){
-      let p = Math.min(cash, d.remain);
-      d.remain -= p;
-      cash -= p;
-      if(p>0) paidNames.push(d.name+' (Ek): '+money(p));
-    }
-  }
+ while(left.some(d=>d.remain>0.005)&&month<MAX_MONTHS){
+   month++;
+   let cash=budget, paidNames=[];
 
-  if(month<=24){
-    lines.push(`<div class="history-item"><span><b>${month}. Ay</b><br><span class="small">${paidNames.join(', ')||'Ödeme yok'}</span></span><b>${money(budget-cash)}</b></div>`);
-  }
+   // Basitleştirilmiş aylık faiz: her ay ödeme öncesi kalan anaparaya uygulanır.
+   for(const d of left){
+     if(d.remain<=0.005)continue;
+     const interest=d.remain*(d.rate/100);
+     d.remain+=interest;
+     totalInterest+=interest;
+   }
+
+   // Önce bütün borçların kayıtlı asgari/taksit tutarları karşılanır.
+   for(const d of left){
+     if(d.remain<=0.005||d.minPay<=0)continue;
+     const payment=Math.min(cash,d.remain,d.minPay);
+     d.remain-=payment;
+     cash-=payment;
+     if(payment>0.005)paidNames.push(esc(d.name)+': '+money(payment));
+   }
+
+   // Kalan bütçe seçilen stratejiye göre öncelikli borca aktarılır.
+   for(const d of left.slice().sort(priority)){
+     if(cash<=0.005)break;
+     if(d.remain<=0.005)continue;
+     const payment=Math.min(cash,d.remain);
+     d.remain-=payment;
+     cash-=payment;
+     if(payment>0.005)paidNames.push(esc(d.name)+' (ek): '+money(payment));
+   }
+
+   const monthPaid=budget-cash;
+   if(month<=24){
+     lines.push(`<div class="history-item"><span><b>${month}. Ay</b><br><span class="small">${paidNames.join(', ')||'Ödeme yok'}</span></span><b>${money(monthPaid)}</b></div>`);
+   }
+
+   // Asgari ödeme faizi dahi karşılamıyorsa borç büyüyebilir; bunu açıkça bildir.
+   if(left.some(d=>d.remain>0.005&&d.minPay>0&&d.minPay<d.remain*(d.rate/100)-0.005)){
+     warning='Bazı borçlarda kayıtlı taksit, aylık faiz tutarını karşılamıyor. Gerçek borç artışı ve banka asgari ödeme kuralları farklı olabilir.';
+   }
+ }
+
+ if(month>=MAX_MONTHS&&left.some(d=>d.remain>0.005)){
+   warning='Bu bütçe ve faizlerle 600 ay içinde kapanış hesaplanamadı. Borç tutarı, faiz veya bütçeyi kontrol edin.';
  }
 
  el.innerHTML=`
-  <p><b>Tahmini Borçsuz Kalma Süresi: ${month} Ay</b></p>
-  <p class="small">Toplam Tahmini Faiz: <b class="red">${money(totalInterestAccrued)}</b></p>
+  <p><b>Tahmini borçsuz kalma süresi: ${month>=MAX_MONTHS?'600+':month+' ay'}</b></p>
+  <p>Başlangıç borcu: <b>${money(debts.reduce((sum,d)=>sum+remaining(data.debts.find(x=>x.name===d.name)||{amount:0,id:'',payments:[]}),0))}</b></p>
+  <p class="small">Simülasyondaki toplam faiz: <b class="red">${money(totalInterest)}</b></p>
+  <p class="small">Aylık asgari/taksit toplamı: <b>${money(requiredMinimum)}</b></p>
+  ${warning?'<p class="small red">⚠️ '+esc(warning)+'</p>':''}
+  <p class="small">Hesap; girilen aylık faiz oranının sabit kaldığını, her ay ödeme öncesi uygulandığını ve ek masraf/vergi olmadığını varsayar. Bankanın kesin ödeme planı değildir.</p>
   ${lines.join('')}
   ${month>24?'<p class="small">İlk 24 ay gösteriliyor.</p>':''}
  `;
