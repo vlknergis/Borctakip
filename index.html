@@ -226,11 +226,12 @@ canvas{width:100%!important;height:100%!important}
 
   <div class="card" style="background:#f8fafc">
     <b>💬 Geliştiriciye Öneri / İstek Gönder</b>
-    <p class="small">"Uygulamaya şu da eklensin" dediğiniz fikirleri doğrudan iletin.</p>
+    <p class="small">Yalnızca uygulamayla ilgili yorum ve geliştirme önerilerini iletebilirsin. Mesajın özel olarak geliştiriciye e-posta gönderilir; uygulamada diğer kullanıcılara gösterilmez.</p>
     <div class="field">
-      <textarea id="userSuggestion" rows="3" placeholder="Örn. Borç kategorilerine simge ekleme seçeneği gelse çok iyi olur..."></textarea>
+      <textarea id="userSuggestion" rows="3" maxlength="2000" placeholder="Uygulamayla ilgili yorumunu veya geliştirme önerini yaz..."></textarea>
     </div>
-    <button class="primary" style="width:100%" onclick="sendFeedback()">Geliştiriciye Gönder (WhatsApp)</button>
+    <button id="sendFeedbackButton" class="primary" style="width:100%" onclick="sendFeedback()">Öneriyi E-posta ile Gönder</button>
+    <div id="feedbackStatus" class="small" role="status" aria-live="polite" style="margin-top:8px"></div>
   </div>
 </section>
 
@@ -247,10 +248,6 @@ canvas{width:100%!important;height:100%!important}
       <label><b>Eski kayıtlardan gelen sabit aylık gelir (₺)</b></label>
       <div class="small">Yeni maaş, kira ve ek gelirlerini Gelir sekmesinden tarihli olarak ekle. Aynı geliri iki kez kaydetme.</div>
       <input id="incomeInput" type="number" step="100" placeholder="Örn. 45000" onchange="saveIncome()">
-    </div>
-    <div class="field">
-      <label><b>Geliştirici WhatsApp Numarası</b></label>
-      <input id="phoneInput" type="tel" placeholder="Örn. 905551112233" onchange="savePhone()">
     </div>
     <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
     <div class="field">
@@ -761,11 +758,6 @@ function saveIncome(){
   save();
 }
 
-function savePhone(){
-  data.phone = document.getElementById('phoneInput').value.trim();
-  save();
-}
-
 function saveSavingsGoal(){
   const input=document.getElementById('savingsGoalInput');
   const value=Number(input.value);
@@ -893,14 +885,32 @@ async function fetchNews(){
 }
 
 /* ÖNERİ / İSTEK GÖNDERME */
-function sendFeedback(){
-  let text = document.getElementById('userSuggestion').value.trim();
-  if(!text){alert('Lütfen iletmek istediğiniz öneriyi yazın.');return}
-  
-  let targetPhone = data.phone || '905551112233';
-  let msg = encodeURIComponent("Borç Takip VabsPro Önerisi:\n\n" + text);
-  window.open(`https://wa.me/${targetPhone}?text=${msg}`, '_blank');
-  document.getElementById('userSuggestion').value = '';
+async function sendFeedback(){
+  const input=document.getElementById('userSuggestion');
+  const button=document.getElementById('sendFeedbackButton');
+  const status=document.getElementById('feedbackStatus');
+  const message=input?.value.trim()||'';
+  if(!message){if(status)status.textContent='Lütfen yorum veya önerini yaz.';return;}
+  if(message.length>2000){if(status)status.textContent='Mesaj en fazla 2000 karakter olabilir.';return;}
+  if(!cloudClient){if(status)status.textContent='Bağlantı kurulamadı. Daha sonra tekrar dene.';return;}
+  try{
+    if(button){button.disabled=true;button.textContent='Gönderiliyor…';}
+    if(status)status.textContent='Oturum kontrol ediliyor…';
+    const {data:{session},error:sessionError}=await cloudClient.auth.getSession();
+    if(sessionError)throw sessionError;
+    if(!session){if(status)status.textContent='Öneri göndermek için önce hesabına giriş yapmalısın.';return;}
+    if(status)status.textContent='Önerin güvenli şekilde gönderiliyor…';
+    const {data,error}=await cloudClient.functions.invoke('send-feedback',{body:{message}});
+    if(error)throw error;
+    if(!data?.success)throw new Error(data?.error||'Mesaj gönderilemedi.');
+    input.value='';
+    if(status)status.textContent='Önerin başarıyla gönderildi. Teşekkür ederiz!';
+  }catch(error){
+    console.error('Öneri gönderilemedi:',error);
+    if(status)status.textContent='Gönderim başarısız oldu. Lütfen tekrar dene.';
+  }finally{
+    if(button){button.disabled=false;button.textContent='Öneriyi E-posta ile Gönder';}
+  }
 }
 
 /* KREDİ HESAPLAMA MOTORU */
@@ -1201,7 +1211,6 @@ function setPaymentMonth(offset){
 
 function render(){
   document.getElementById('incomeInput').value = data.income || '';
-  document.getElementById('phoneInput').value = data.phone || '';
   const savingsInput=document.getElementById('savingsGoalInput');if(savingsInput)savingsInput.value=data.monthlySavingsGoal||'';
   let total=data.debts.reduce((s,d)=>s+remaining(d),0);
   document.getElementById('total').textContent=money(total);
