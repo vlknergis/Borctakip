@@ -24,6 +24,12 @@ button{border:0;cursor:pointer;font:inherit}.primary{background:var(--blue);colo
 nav{position:fixed;bottom:0;left:0;right:0;background:#ffffffed;backdrop-filter:blur(12px);border-top:1px solid var(--line);display:flex;justify-content:center;z-index:5;padding:8px 2px calc(8px + env(safe-area-inset-bottom))}
 nav button{background:transparent;color:var(--muted);font-size:9px;flex:1;max-width:90px;padding:4px 1px}nav button b{display:block;font-size:16px;margin-bottom:1px}nav button.active{color:var(--blue);font-weight:750}
 .view{display:none}.view.active{display:block}
+ #authGate{position:fixed;inset:0;z-index:1000;background:linear-gradient(145deg,#101827,#20385f);display:flex;align-items:center;justify-content:center;padding:22px}
+ #authGate.hidden{display:none}#authGate .auth-panel{width:100%;max-width:420px;background:#fff;border-radius:22px;padding:24px;box-shadow:0 20px 60px #0005}
+ #authGate h1{font-size:23px;margin:0 0 8px;color:#172033}#authGate p{font-size:13px;color:#718096;line-height:1.55}
+ #authGate input{width:100%;padding:13px;border:1px solid #e7edf5;border-radius:11px;font:inherit;margin:6px 0 10px}
+ #authGate .auth-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}#authGate .auth-actions button{width:100%}
+ #authGateStatus{font-size:12px;color:#718096;min-height:18px;margin-top:12px}
 .row{display:flex;justify-content:space-between;gap:10px;align-items:center}.pill{font-size:11px;padding:4px 8px;border-radius:20px;background:#fff3dc;color:var(--amber)}
 .modal{display:none;position:fixed;inset:0;background:#10182788;z-index:10;align-items:flex-end;justify-content:center}.modal.show{display:flex}.sheet{background:white;width:100%;max-width:600px;border-radius:22px 22px 0 0;padding:20px 17px calc(22px + env(safe-area-inset-bottom));max-height:90vh;overflow:auto}.sheet h3{margin:0 0 15px}.field{margin:11px 0}.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}.field input,.field select,.field textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:11px;font:inherit;background:white;color:var(--ink)}.actions{display:flex;gap:9px;margin-top:17px}.actions button{flex:1}.secondary{background:#eef1f6;color:#344054;padding:11px;border-radius:12px;font-weight:700}.danger{background:#fff0f1;color:var(--red);padding:8px 10px;border-radius:9px;font-size:12px}
 .history-item{padding:10px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.notice{font-size:12px;color:var(--muted);line-height:1.5;margin-top:15px}
@@ -42,6 +48,14 @@ canvas{width:100%!important;height:100%!important}
 </style>
 </head>
 <body>
+<div id="authGate"><div class="auth-panel">
+ <div style="font-size:12px;font-weight:800;letter-spacing:1px;color:#3568e8;margin-bottom:12px">◈ BORÇ TAKİP VABSPRO</div>
+ <h1>Hesabına giriş yap</h1><p>Borçlarını ve finansal kayıtlarını güvenle yönetmek için giriş yap veya yeni hesap oluştur. Verilerin yalnızca kendi hesabında saklanır ve cihazların arasında eşitlenir.</p>
+ <label for="authGateEmail" style="font-size:12px;color:#718096">E-posta</label><input id="authGateEmail" type="email" autocomplete="email" placeholder="ornek@mail.com">
+ <label for="authGatePassword" style="font-size:12px;color:#718096">Şifre</label><input id="authGatePassword" type="password" autocomplete="current-password" minlength="8" placeholder="En az 8 karakter">
+ <div class="auth-actions"><button class="primary" type="button" onclick="cloudSignIn()">Giriş Yap</button><button class="ghost" type="button" onclick="cloudSignUp()">Hesap Oluştur</button></div>
+ <button class="ghost" style="width:100%;margin-top:8px" type="button" onclick="cloudResetPassword()">Şifremi Unuttum</button><div id="authGateStatus">Hesabınla giriş yaptığında kayıtların açılır.</div>
+</div></div>
 <header>
   <div class="top"><div class="brand">◈ Borç Takip VabsPro</div><div class="tag">KİŞİSEL FİNANS</div></div>
   <div class="header-totals">
@@ -273,7 +287,7 @@ canvas{width:100%!important;height:100%!important}
   </div>
   <div class="card">
     <b>Yedekleme Merkezi</b>
-    <p class="small">Borç, ödeme geçmişi, gelir, sabit gider ve günlük harcamaların tek JSON dosyasına kaydedilir. Dosyayı telefonuna veya güvenli bir bulut klasörüne sakla. Kayıtlar otomatik olarak sunucuya gönderilmez.</p>
+    <p class="small">Borç, ödeme geçmişi, gelir, sabit gider ve günlük harcamaların tek JSON dosyasına kaydedilir. Dosyayı telefonuna veya güvenli bir bulut klasörüne sakla. Kayıtlar hesabınla otomatik eşitlenir; çevrimdışıyken cihazda saklanır.</p>
     <button class="primary" onclick="backup()">Tüm Verileri Yedekle</button>
     <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
     <b>Yedekten Geri Yükle</b>
@@ -351,7 +365,8 @@ const BORCTAKIP_SUPABASE_URL='https://ieonwjnmdyzpirjvcemt.supabase.co';
 const BORCTAKIP_SUPABASE_KEY='sb_publishable_Y0d7RaGCvG-efuQckQWGeQ_G7FdcVrK';
 let cloudClient=null;
 try{if(window.supabase&&typeof window.supabase.createClient==='function'){cloudClient=window.supabase.createClient(BORCTAKIP_SUPABASE_URL,BORCTAKIP_SUPABASE_KEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}});}}catch(error){console.error('Supabase başlatılamadı',error);}
-function cloudStatus(message){const el=document.getElementById('cloudAuthStatus');if(el)el.textContent=message;}
+function cloudStatus(message){const el=document.getElementById('cloudAuthStatus');if(el)el.textContent=message;const gate=document.getElementById('authGateStatus');if(gate)gate.textContent=message;}
+function setAuthGate(visible){const gate=document.getElementById('authGate');if(gate)gate.classList.toggle('hidden',!visible);}
 function renderCloudAuth(session){
  const form=document.getElementById('cloudAuthForm');
  const profile=document.getElementById('cloudProfile');
@@ -360,13 +375,13 @@ function renderCloudAuth(session){
  if(profile)profile.style.display=session?'block':'none';
  if(email)email.textContent=session?.user?.email||'';
 }
-function cloudCredentials(){const email=(document.getElementById('cloudEmail')?.value||'').trim();const password=document.getElementById('cloudPassword')?.value||'';if(!email||!password)throw new Error('E-posta ve şifre alanlarını doldur.');if(password.length<8)throw new Error('Şifre en az 8 karakter olmalı.');return {email,password};}
+function cloudCredentials(){const email=(document.getElementById('authGateEmail')?.value||document.getElementById('cloudEmail')?.value||'').trim();const password=document.getElementById('authGatePassword')?.value||document.getElementById('cloudPassword')?.value||'';if(!email||!password)throw new Error('E-posta ve şifre alanlarını doldur.');if(password.length<8)throw new Error('Şifre en az 8 karakter olmalı.');return {email,password};}
 async function cloudSignUp(){try{if(!cloudClient)throw new Error('Bulut istemcisi yüklenemedi. İnternet bağlantısını kontrol et.');const {email,password}=cloudCredentials();cloudStatus('Hesap oluşturuluyor…');const {data,error}=await cloudClient.auth.signUp({email,password});if(error)throw error;cloudStatus(data.session?'Hesap oluşturuldu ve giriş yapıldı. Bulut yedekleme hazır.':'Kayıt isteği alındı. E-postana gelen doğrulama bağlantısını kontrol et.');}catch(error){cloudStatus(error.message||'Hesap oluşturulamadı.');}}
 async function cloudSignIn(){try{if(!cloudClient)throw new Error('Bulut istemcisi yüklenemedi. İnternet bağlantısını kontrol et.');const {email,password}=cloudCredentials();cloudStatus('Giriş yapılıyor…');const {data,error}=await cloudClient.auth.signInWithPassword({email,password});if(error)throw error;cloudStatus('Giriş yapıldı: '+(data.user?.email||email)+'. Bulut yedekleme hazır.');}catch(error){cloudStatus(error.message||'Giriş yapılamadı.');}}
 async function cloudResetPassword(){
  try{
   if(!cloudClient)throw new Error('Bulut istemcisi yüklenemedi. İnternet bağlantısını kontrol et.');
-  const email=(document.getElementById('cloudEmail')?.value||'').trim();
+  const email=(document.getElementById('authGateEmail')?.value||document.getElementById('cloudEmail')?.value||'').trim();
   if(!email)throw new Error('Şifre sıfırlama bağlantısı için e-posta adresini yaz.');
   cloudStatus('Şifre sıfırlama e-postası gönderiliyor…');
   const redirectTo=window.location.origin+window.location.pathname;
@@ -528,7 +543,8 @@ async function cloudUpload(){
   const {data:older,error:readError}=await cloudClient.from('user_backup_history').select('id').eq('user_id',user.id).order('created_at',{ascending:false}).range(10,1000);
   if(readError)throw readError;
   if(older?.length){const {error:deleteError}=await cloudClient.from('user_backup_history').delete().eq('user_id',user.id).in('id',older.map(x=>x.id));if(deleteError)throw deleteError;}
-  const meta=document.getElementById('cloudBackupMeta');if(meta)meta.textContent='Bulut yedeği kaydedildi · '+new Date(savedRow.updated_at).toLocaleString('tr-TR')+' · '+backupRecordCount(local)+' kayıt · sürüm '+savedRow.revision;
+  cloudRevision=Number(savedRow.revision);cloudSyncPending=false;
+   const meta=document.getElementById('cloudBackupMeta');if(meta)meta.textContent='Bulut yedeği kaydedildi · '+new Date(savedRow.updated_at).toLocaleString('tr-TR')+' · '+backupRecordCount(local)+' kayıt · sürüm '+savedRow.revision;
   cloudStatus('Bulut yedekleme başarılı. Yeni yedek doğrudan yedek geçmişine eklendi; telefonundaki kayıtlar korundu.');
   await cloudRefreshBackupInfo();
  }catch(error){cloudStatus(error.message||'Bulut yedeklemesi başarısız.');}
@@ -558,26 +574,24 @@ async function cloudDownload(){
  }catch(error){cloudStatus(error.message||'Bulut yedeği yüklenemedi.');}
 }
 async function initCloudAuth(){
- if(!cloudClient){cloudStatus('Bulut istemcisi yüklenemedi.');return;}
- const {data,error}=await cloudClient.auth.getSession();
- if(error){cloudStatus('Oturum kontrol edilemedi: '+error.message);return;}
- const session=data.session;
- renderCloudAuth(session);
- cloudStatus(session?'Profilin hazır. Bulut yedekleme kullanıma açık.':'Henüz giriş yapılmadı. Yerel kayıtların bu cihazda kalır.');
- if(session)cloudRefreshBackupInfo();
- if(!cloudAuthListenerReady){
-  cloudAuthListenerReady=true;
-  cloudClient.auth.onAuthStateChange((_event,nextSession)=>{
-   renderCloudAuth(nextSession);
-   cloudStatus(nextSession?'Profilin hazır. Bulut yedekleme kullanıma açık.':'Oturum kapatıldı. Yerel kayıtların bu cihazda kalır.');
-   if(nextSession)cloudRefreshBackupInfo();
-  });
- }
+ if(!cloudClient){cloudStatus('Bulut bağlantısı kurulamadı. İnternet bağlantısını kontrol et.');setAuthGate(true);return;}
+ const {data:sessionData,error}=await cloudClient.auth.getSession();
+ if(error){cloudStatus('Oturum kontrol edilemedi: '+error.message);setAuthGate(true);return;}
+ const session=sessionData.session;renderCloudAuth(session);
+ if(session){try{await activateCloudUser(session.user);}catch(error){cloudStatus('Hesap verileri yüklenemedi: '+(error.message||'Bilinmeyen hata'));setAuthGate(true);}}
+ else{setAuthGate(true);cloudStatus('Devam etmek için hesabına giriş yap.');}
+ if(!cloudAuthListenerReady){cloudAuthListenerReady=true;cloudClient.auth.onAuthStateChange((_event,nextSession)=>{
+  renderCloudAuth(nextSession);
+  if(nextSession)setTimeout(()=>activateCloudUser(nextSession.user).catch(error=>{cloudStatus('Hesap verileri yüklenemedi: '+(error.message||'Bilinmeyen hata'));setAuthGate(true);}),0);
+  else{deactivateCloudUser();setAuthGate(true);cloudStatus('Oturum kapatıldı. Kişisel kayıtların bu cihazda korunuyor.');}
+ });}
 }
 </script>
 <script>
 const LEGACY_KEY='borctakip_v1';
-const KEY='borctakip_v2';
+let KEY='borctakip_v2_guest';
+let activeUserId=null,cloudRevision=null,cloudSyncTimer=null,cloudSyncBusy=false,cloudSyncPending=false;
+function userDataKey(userId){return 'borctakip_v2_user_'+userId;}
 const EMPTY_DATA={debts:[],payments:[],expenses:[],expensePayments:[],incomes:[],spendings:[],income:0,phone:'',monthlySavingsGoal:0};
 
 function readStoredData(key){
@@ -593,22 +607,53 @@ function readStoredData(key){
   }
 }
 
-// Önce yeni kayıtları oku. Yoksa eski kayıtları kopyala; eski anahtarı SİLME.
-const currentData=readStoredData(KEY);
-const legacyData=currentData?null:readStoredData(LEGACY_KEY);
-let data=currentData||legacyData||{...EMPTY_DATA};
-if(!Array.isArray(data.debts)) data.debts=[];
-if(!Array.isArray(data.payments)) data.payments=[];
-if(!Array.isArray(data.expenses)) data.expenses=[];
-if(!Array.isArray(data.expensePayments)) data.expensePayments=[];
-if(!Array.isArray(data.incomes)) data.incomes=[];
-if(!Array.isArray(data.spendings)) data.spendings=[];
-if(!Number.isFinite(Number(data.income))) data.income=0;
-if(!Number.isFinite(Number(data.monthlySavingsGoal))||Number(data.monthlySavingsGoal)<0)data.monthlySavingsGoal=0;
-if(!data.phone) data.phone='';
-if(!currentData && legacyData){
-  try { localStorage.setItem(KEY,JSON.stringify(data)); }
-  catch(error) { console.warn('Yeni kayıt alanına geçiş yapılamadı; eski kayıtlar korunuyor.',error); }
+// Giriş yapılana kadar finansal kayıtlar belleğe yüklenmez; eski anahtarlar korunur.
+let data={...EMPTY_DATA};
+function normalizeUserData(source){
+ const clean={...EMPTY_DATA,...(source||{})};
+ ['debts','payments','expenses','expensePayments','incomes','spendings'].forEach(key=>{if(!Array.isArray(clean[key]))clean[key]=[];});
+ if(!Number.isFinite(Number(clean.income)))clean.income=0;
+ if(!Number.isFinite(Number(clean.monthlySavingsGoal))||Number(clean.monthlySavingsGoal)<0)clean.monthlySavingsGoal=0;
+ if(typeof clean.phone!=='string')clean.phone='';return clean;
+}
+function hasMeaningfulData(source){return backupRecordCount(source)>0||Number(source?.income)>0||Number(source?.monthlySavingsGoal)>0||!!source?.phone;}
+function saveSafetySnapshot(key,source){
+ const snapshot=JSON.parse(JSON.stringify(source)),payload={app:'Borctakip',version:2,exportedAt:new Date().toISOString(),recordCount:backupRecordCount(snapshot),data:snapshot};
+ try{localStorage.setItem(key,JSON.stringify(payload));return true;}catch(error){return false;}
+}
+async function activateCloudUser(user){
+ if(!user?.id)throw new Error('Kullanıcı hesabı doğrulanamadı.');
+ if(activeUserId===user.id)return;
+ if(cloudSyncTimer){clearTimeout(cloudSyncTimer);cloudSyncTimer=null;}
+ activeUserId=user.id;KEY=userDataKey(user.id);
+ const localRaw=readStoredData(KEY),local=localRaw?normalizeUserData(localRaw):null;
+ const oldCurrent=readStoredData('borctakip_v2'),oldLegacy=readStoredData(LEGACY_KEY);
+ const legacy=oldCurrent||oldLegacy?normalizeUserData(oldCurrent||oldLegacy):null;
+ cloudStatus('Hesabının kayıtları güvenli şekilde kontrol ediliyor…');
+ const remote=await cloudGetBackup(user.id);
+ if(remote&&Number(remote.schema_version)!==2)throw new Error('Bulut yedeği uygulama sürümüyle uyumlu değil; veriler değiştirilmedi.');
+ if(remote)cloudValidatePayload(remote.payload);
+ if(local&&remote){
+  const useCloud=confirm('Bu hesapta hem telefonda hem bulutta kayıt bulundu.\n\nTamam: Buluttaki son yedeği bu telefona yükle.\nİptal: Telefondaki kayıtları koru ve buluta eşitle.\n\nÖnce telefon verilerinin güvenlik kopyası alınır.');
+  if(useCloud){if(!saveSafetySnapshot('borctakip_pre_account_switch',local))throw new Error('Telefon kayıtlarının güvenlik kopyası alınamadı.');data=normalizeUserData(remote.payload);cloudRevision=Number(remote.revision)||null;}
+  else{data=local;cloudRevision=Number(remote.revision)||null;}
+ }else if(remote){data=normalizeUserData(remote.payload);cloudRevision=Number(remote.revision)||null;}
+ else if(local){data=local;cloudRevision=null;}
+ else if(legacy&&hasMeaningfulData(legacy)){
+  const importOld=confirm('Bu telefonda önceki BorçTakip sürümünden '+backupRecordCount(legacy)+' kayıt bulundu.\n\nBu kayıtları yeni hesabına aktarmak ister misin?\n\nTamam: Önce güvenlik kopyası al, sonra bu hesaba aktar.\nİptal: Eski kayıtları olduğu gibi bırak ve boş hesapla başla.');
+  if(importOld){if(!saveSafetySnapshot('borctakip_pre_account_import',legacy))throw new Error('Eski kayıtların güvenlik kopyası alınamadı. Eski kayıtlar korunuyor.');data=legacy;cloudRevision=null;}
+  else{data={...EMPTY_DATA};cloudRevision=null;}
+ }else{data={...EMPTY_DATA};cloudRevision=null;}
+ data=normalizeUserData(data);
+ try{localStorage.setItem(KEY,JSON.stringify(data));}catch(error){throw new Error('Hesap kayıtları telefona kaydedilemedi; mevcut kayıtlar korunuyor.');}
+ render();setAuthGate(false);
+ cloudStatus(navigator.onLine?'Hesap hazır. Kayıtların otomatik eşitlenecek.':'Çevrimdışısın. Kayıtların telefonda korunacak; bağlantı gelince eşitlenecek.');
+ if(navigator.onLine&&!remote&&hasMeaningfulData(data))scheduleCloudSync(500);
+ await cloudRefreshBackupInfo();
+}
+function deactivateCloudUser(){
+ if(cloudSyncTimer){clearTimeout(cloudSyncTimer);cloudSyncTimer=null;}
+ activeUserId=null;KEY='borctakip_v2_guest';cloudRevision=null;cloudSyncPending=false;data={...EMPTY_DATA};render();
 }
 
 const money=n=>new Intl.NumberFormat('tr-TR',{style:'currency',currency:'TRY'}).format(Number(n)||0);
@@ -622,7 +667,36 @@ function addDays(dateStr, days) {
   return dateKey(d);
 }
 
-function save(){try{localStorage.setItem(KEY,JSON.stringify(data));const d=document.getElementById('connectionDetail');if(d)d.textContent='Kayıtlar bu cihazda saklanıyor · '+new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});render();return true}catch(error){alert('Kayıt cihaz hafızasına yazılamadı. Depolama alanını kontrol et; uygulama verilerini silme.');return false}}
+function save(options={}){
+ if(!activeUserId){alert('Kayıt yapmadan önce hesabına giriş yap.');return false;}
+ try{localStorage.setItem(KEY,JSON.stringify(data));const d=document.getElementById('connectionDetail');if(d)d.textContent='Bu hesaba ait kayıtlar cihazda saklandı · '+new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});render();if(!options.skipCloudSync)scheduleCloudSync();return true;}
+ catch(error){alert('Kayıt cihaz hafızasına yazılamadı. Depolama alanını kontrol et; uygulama verilerini silme.');return false;}
+}
+function scheduleCloudSync(delay=1200){
+ if(!activeUserId)return;cloudSyncPending=true;if(cloudSyncTimer)clearTimeout(cloudSyncTimer);
+ if(!navigator.onLine){cloudStatus('Çevrimdışısın. Değişiklikler telefonda saklandı; bağlantı gelince eşitlenecek.');return;}
+ cloudSyncTimer=setTimeout(()=>{cloudSyncTimer=null;runCloudSync();},delay);
+}
+async function runCloudSync(){
+ if(!activeUserId||!cloudSyncPending||!navigator.onLine||cloudSyncBusy)return;
+ cloudSyncBusy=true;const userId=activeUserId,snapshot=JSON.parse(JSON.stringify(data));
+ try{
+  cloudValidatePayload(snapshot);const current=await cloudGetBackup(userId);if(activeUserId!==userId)return;
+  if(current){
+   if(Number(current.schema_version)!==2)throw new Error('Bulut verisinin sürümü uyumsuz. Otomatik eşitleme durduruldu.');
+   if(cloudRevision!==null&&Number(current.revision)!==Number(cloudRevision)){cloudSyncPending=false;throw new Error('Başka bir cihazda da değişiklik yapılmış. Veri kaybını önlemek için otomatik eşitleme durduruldu; Ayarlar bölümünden bulut yedeğini kontrol et.');}
+   await cloudArchiveCurrentBackup(userId,current);
+   const {data:updated,error}=await cloudClient.from('user_backups').update({payload:snapshot,schema_version:2}).eq('user_id',userId).eq('revision',current.revision).select('revision,updated_at').maybeSingle();
+   if(error)throw error;if(!updated)throw new Error('Eşitleme sırasında başka bir cihaz değişiklik yaptı. Kayıtların telefonda korundu; bulutu kontrol et.');
+   cloudRevision=Number(updated.revision);
+  }else{
+   const {data:inserted,error}=await cloudClient.from('user_backups').insert({user_id:userId,payload:snapshot,schema_version:2}).select('revision,updated_at').single();
+   if(error)throw error;cloudRevision=Number(inserted.revision);
+  }
+  if(activeUserId===userId){cloudSyncPending=false;cloudStatus('Otomatik eşitleme tamamlandı · '+new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}));const meta=document.getElementById('cloudBackupMeta');if(meta)meta.textContent='Otomatik bulut eşitlemesi · '+new Date().toLocaleString('tr-TR')+' · sürüm '+cloudRevision;}
+ }catch(error){cloudStatus(error.message||'Bulut eşitlemesi başarısız. Telefonda kayıtlı verilerin korunuyor.');}
+ finally{cloudSyncBusy=false;if(cloudSyncPending&&activeUserId===userId&&navigator.onLine&&cloudRevision!==null)scheduleCloudSync(2500);}
+}
 function remaining(d){return Math.max(0,d.amount-data.payments.filter(p=>p.debtId===d.id).reduce((a,p)=>a+p.amount,0))}
 
 /* GELİR KAYITLARI */
@@ -1525,7 +1599,7 @@ function updateConnectionStatus(){
  label.textContent=online?'Ağ bağlantısı var':'Çevrimdışı mod';
  detail.textContent=online?'Kayıtlar bu cihazda saklanır · Bulut yedeğini Ayarlar bölümünden elle yönetebilirsin.':'Ağ bağlantısı yok · Kayıtlarını bu cihazda kullanmaya devam edebilirsin.';
 }
-window.addEventListener('online',updateConnectionStatus);
+window.addEventListener('online',()=>{updateConnectionStatus();if(activeUserId&&cloudSyncPending)scheduleCloudSync(300);});
 window.addEventListener('offline',updateConnectionStatus);
 updateConnectionStatus();
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
