@@ -636,9 +636,15 @@ async function activateCloudUser(user){
  if(remote&&Number(remote.schema_version)!==2)throw new Error('Bulut yedeği uygulama sürümüyle uyumlu değil; veriler değiştirilmedi.');
  if(remote)cloudValidatePayload(remote.payload);
  if(local&&remote){
-  const useCloud=confirm('Bu hesapta hem telefonda hem bulutta kayıt bulundu.\n\nTamam: Buluttaki son yedeği bu telefona yükle.\nİptal: Telefondaki kayıtları koru ve buluta eşitle.\n\nÖnce telefon verilerinin güvenlik kopyası alınır.');
-  if(useCloud){if(!saveSafetySnapshot('borctakip_pre_account_switch',local))throw new Error('Telefon kayıtlarının güvenlik kopyası alınamadı.');data=normalizeUserData(remote.payload);cloudRevision=Number(remote.revision)||null;}
-  else{data=local;cloudRevision=Number(remote.revision)||null;}
+  const cloudData=normalizeUserData(remote.payload);
+  const sameData=JSON.stringify(local)===JSON.stringify(cloudData);
+  if(sameData){
+   data=local;cloudRevision=Number(remote.revision)||null;
+  }else{
+   const useCloud=confirm('Bu hesapta hem telefonda hem bulutta farklı kayıtlar bulundu.\\n\\nTamam: Buluttaki son yedeği bu telefona yükle.\\nİptal: Telefondaki kayıtları koru ve buluta eşitle.\\n\\nÖnce telefon verilerinin güvenlik kopyası alınır.');
+   if(useCloud){if(!saveSafetySnapshot('borctakip_pre_account_switch',local))throw new Error('Telefon kayıtlarının güvenlik kopyası alınamadı.');data=cloudData;cloudRevision=Number(remote.revision)||null;}
+   else{data=local;cloudRevision=Number(remote.revision)||null;scheduleCloudSync(500);}
+  }
  }else if(remote){data=normalizeUserData(remote.payload);cloudRevision=Number(remote.revision)||null;}
  else if(local){data=local;cloudRevision=null;}
  else if(legacy&&hasMeaningfulData(legacy)){
