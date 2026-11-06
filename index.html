@@ -686,7 +686,8 @@ async function runCloudSync(){
   cloudValidatePayload(snapshot);const current=await cloudGetBackup(userId);if(activeUserId!==userId)return;
   if(current){
    if(Number(current.schema_version)!==2)throw new Error('Bulut verisinin sürümü uyumsuz. Otomatik eşitleme durduruldu.');
-   if(cloudRevision!==null&&Number(current.revision)!==Number(cloudRevision)){cloudSyncPending=false;throw new Error('Başka bir cihazda da değişiklik yapılmış. Veri kaybını önlemek için otomatik eşitleme durduruldu; Ayarlar bölümünden bulut yedeğini kontrol et.');}
+   if(cloudRevision===null){cloudSyncPending=false;throw new Error('Bu hesapta başka bir cihazda yeni bulut kaydı oluşmuş. Veri kaybını önlemek için eşitleme durduruldu; Ayarlar bölümünden bulut yedeğini kontrol et.');}
+   if(Number(current.revision)!==Number(cloudRevision)){cloudSyncPending=false;throw new Error('Başka bir cihazda da değişiklik yapılmış. Veri kaybını önlemek için otomatik eşitleme durduruldu; Ayarlar bölümünden bulut yedeğini kontrol et.');}
    await cloudArchiveCurrentBackup(userId,current);
    const {data:updated,error}=await cloudClient.from('user_backups').update({payload:snapshot,schema_version:2}).eq('user_id',userId).eq('revision',current.revision).select('revision,updated_at').maybeSingle();
    if(error)throw error;if(!updated){cloudSyncPending=false;throw new Error('Eşitleme sırasında başka bir cihaz değişiklik yaptı. Kayıtların telefonda korundu; bulutu kontrol et.');}
@@ -1599,7 +1600,7 @@ function updateConnectionStatus(){
  if(!pill||!label||!detail)return;
  pill.classList.toggle('offline',!online);
  label.textContent=online?'Ağ bağlantısı var':'Çevrimdışı mod';
- detail.textContent=online?'Kayıtlar bu cihazda saklanır · Bulut yedeğini Ayarlar bölümünden elle yönetebilirsin.':'Ağ bağlantısı yok · Kayıtlarını bu cihazda kullanmaya devam edebilirsin.';
+ detail.textContent=online?'Hesabındaki kayıtlar otomatik olarak bulutla eşitlenir.':'Çevrimdışı kayıtlar telefonda korunur; bağlantı gelince eşitlenir.';
 }
 window.addEventListener('online',()=>{updateConnectionStatus();if(activeUserId)scheduleCloudSync(300);});
 window.addEventListener('offline',updateConnectionStatus);
