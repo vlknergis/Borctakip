@@ -487,7 +487,7 @@ async function cloudRestoreHistory(historyId){
   if(Number(item.schema_version)!==2)throw new Error('Bu eski yedek farklı bir şema sürümünde; güvenli geri yükleme durduruldu.');
   cloudValidatePayload(item.payload);
   const count=backupRecordCount(item.payload),date=cloudFormatDate(item.created_at);
-  if(!confirm('Seçilen eski yedek: '+date+'\\nKayıt sayısı: '+count+'\\nRevizyon: '+item.source_revision+'\\n\\nBu işlem telefondaki mevcut kayıtların yerine seçilen yedeği yükler. Önce mevcut telefon verileri güvenlik kopyasına alınacak. Devam edilsin mi?'))return;
+  if(!confirm('Seçilen eski yedek: '+date+'\nKayıt sayısı: '+count+'\nRevizyon: '+item.source_revision+'\n\nBu işlem telefondaki mevcut kayıtların yerine seçilen yedeği yükler. Önce mevcut telefon verileri güvenlik kopyasına alınacak. Devam edilsin mi?'))return;
   const oldData=cloudSaveLocalSafetyCopy();
   const restored={...item.payload};
   ['debts','payments','expenses','expensePayments','incomes','spendings'].forEach(key=>{if(!Array.isArray(restored[key]))restored[key]=[];});
@@ -641,7 +641,7 @@ async function activateCloudUser(user){
   if(sameData){
    data=local;cloudRevision=Number(remote.revision)||null;
   }else{
-   const useCloud=confirm('Bu hesapta hem telefonda hem bulutta farklı kayıtlar bulundu.\\n\\nTamam: Buluttaki son yedeği bu telefona yükle.\\nİptal: Telefondaki kayıtları koru ve buluta eşitle.\\n\\nÖnce telefon verilerinin güvenlik kopyası alınır.');
+   const useCloud=confirm('Bu hesapta hem telefonda hem bulutta farklı kayıtlar bulundu.\n\nTamam: Buluttaki son yedeği bu telefona yükle.\nİptal: Telefondaki kayıtları koru ve buluta eşitle.\n\nÖnce telefon verilerinin güvenlik kopyası alınır.');
    if(useCloud){if(!saveSafetySnapshot('borctakip_pre_account_switch',local))throw new Error('Telefon kayıtlarının güvenlik kopyası alınamadı.');data=cloudData;cloudRevision=Number(remote.revision)||null;}
    else{data=local;cloudRevision=Number(remote.revision)||null;scheduleCloudSync(500);}
   }
