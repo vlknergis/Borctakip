@@ -272,7 +272,7 @@ canvas{width:100%!important;height:100%!important}
   </div>
   <div class="card" id="cloudAccountCard">
     <b>Bulut Hesabı</b>
-    <p class="small">Hesabına giriş yaptıktan sonra cihazındaki kayıtları elle buluta yedekleyebilir veya buluttaki yedeği bu cihaza geri yükleyebilirsin. Otomatik eşitleme kapalıdır; hiçbir kayıt iznin olmadan üzerine yazılmaz.</p>
+    <p class="small">Hesabına giriş yaptığında kayıtların otomatik olarak eşitlenir. Çakışma olursa veri kaybını önlemek için eşitleme durdurulur ve senden kontrol istenir.</p>
     <div id="cloudAuthForm">
       <div class="field"><label for="cloudEmail">E-posta</label><input id="cloudEmail" type="email" autocomplete="email" placeholder="ornek@mail.com"></div>
       <div class="field"><label for="cloudPassword">Şifre</label><input id="cloudPassword" type="password" autocomplete="current-password" minlength="8" placeholder="En az 8 karakter"></div>
@@ -628,7 +628,8 @@ async function activateCloudUser(user){
  activeUserId=user.id;KEY=userDataKey(user.id);
  const localRaw=readStoredData(KEY),local=localRaw?normalizeUserData(localRaw):null;
  const oldCurrent=readStoredData('borctakip_v2'),oldLegacy=readStoredData(LEGACY_KEY);
- const legacy=oldCurrent||oldLegacy?normalizeUserData(oldCurrent||oldLegacy):null;
+ const migrationOwner=localStorage.getItem('borctakip_legacy_migration_owner');
+ const legacy=(migrationOwner&&migrationOwner!==user.id)?null:(oldCurrent||oldLegacy?normalizeUserData(oldCurrent||oldLegacy):null);
  cloudStatus('Hesabının kayıtları güvenli şekilde kontrol ediliyor…');
  const remote=await cloudGetBackup(user.id);
  if(remote&&Number(remote.schema_version)!==2)throw new Error('Bulut yedeği uygulama sürümüyle uyumlu değil; veriler değiştirilmedi.');
@@ -643,6 +644,7 @@ async function activateCloudUser(user){
   const importOld=confirm('Bu telefonda önceki BorçTakip sürümünden '+backupRecordCount(legacy)+' kayıt bulundu.\n\nBu kayıtları yeni hesabına aktarmak ister misin?\n\nTamam: Önce güvenlik kopyası al, sonra bu hesaba aktar.\nİptal: Eski kayıtları olduğu gibi bırak ve boş hesapla başla.');
   if(importOld){if(!saveSafetySnapshot('borctakip_pre_account_import',legacy))throw new Error('Eski kayıtların güvenlik kopyası alınamadı. Eski kayıtlar korunuyor.');data=legacy;cloudRevision=null;}
   else{data={...EMPTY_DATA};cloudRevision=null;}
+  localStorage.setItem('borctakip_legacy_migration_owner',user.id);
  }else{data={...EMPTY_DATA};cloudRevision=null;}
  data=normalizeUserData(data);
  try{localStorage.setItem(KEY,JSON.stringify(data));}catch(error){throw new Error('Hesap kayıtları telefona kaydedilemedi; mevcut kayıtlar korunuyor.');}
@@ -687,15 +689,15 @@ async function runCloudSync(){
    if(cloudRevision!==null&&Number(current.revision)!==Number(cloudRevision)){cloudSyncPending=false;throw new Error('Başka bir cihazda da değişiklik yapılmış. Veri kaybını önlemek için otomatik eşitleme durduruldu; Ayarlar bölümünden bulut yedeğini kontrol et.');}
    await cloudArchiveCurrentBackup(userId,current);
    const {data:updated,error}=await cloudClient.from('user_backups').update({payload:snapshot,schema_version:2}).eq('user_id',userId).eq('revision',current.revision).select('revision,updated_at').maybeSingle();
-   if(error)throw error;if(!updated)throw new Error('Eşitleme sırasında başka bir cihaz değişiklik yaptı. Kayıtların telefonda korundu; bulutu kontrol et.');
+   if(error)throw error;if(!updated){cloudSyncPending=false;throw new Error('Eşitleme sırasında başka bir cihaz değişiklik yaptı. Kayıtların telefonda korundu; bulutu kontrol et.');}
    cloudRevision=Number(updated.revision);
   }else{
    const {data:inserted,error}=await cloudClient.from('user_backups').insert({user_id:userId,payload:snapshot,schema_version:2}).select('revision,updated_at').single();
    if(error)throw error;cloudRevision=Number(inserted.revision);
   }
-  if(activeUserId===userId){cloudSyncPending=false;cloudStatus('Otomatik eşitleme tamamlandı · '+new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}));const meta=document.getElementById('cloudBackupMeta');if(meta)meta.textContent='Otomatik bulut eşitlemesi · '+new Date().toLocaleString('tr-TR')+' · sürüm '+cloudRevision;}
- }catch(error){cloudStatus(error.message||'Bulut eşitlemesi başarısız. Telefonda kayıtlı verilerin korunuyor.');}
- finally{cloudSyncBusy=false;if(cloudSyncPending&&activeUserId===userId&&navigator.onLine&&cloudRevision!==null)scheduleCloudSync(2500);}
+  if(activeUserId===userId){cloudSyncPending=JSON.stringify(data)!==JSON.stringify(snapshot);cloudStatus('Otomatik eşitleme tamamlandı · '+new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}));const meta=document.getElementById('cloudBackupMeta');if(meta)meta.textContent='Otomatik bulut eşitlemesi · '+new Date().toLocaleString('tr-TR')+' · sürüm '+cloudRevision;}
+ }catch(error){cloudSyncPending=false;cloudStatus(error.message||'Bulut eşitlemesi başarısız. Telefonda kayıtlı verilerin korunuyor.');}
+ finally{cloudSyncBusy=false;if(cloudSyncPending&&activeUserId===userId&&navigator.onLine)scheduleCloudSync(2500);}
 }
 function remaining(d){return Math.max(0,d.amount-data.payments.filter(p=>p.debtId===d.id).reduce((a,p)=>a+p.amount,0))}
 
@@ -1599,7 +1601,7 @@ function updateConnectionStatus(){
  label.textContent=online?'Ağ bağlantısı var':'Çevrimdışı mod';
  detail.textContent=online?'Kayıtlar bu cihazda saklanır · Bulut yedeğini Ayarlar bölümünden elle yönetebilirsin.':'Ağ bağlantısı yok · Kayıtlarını bu cihazda kullanmaya devam edebilirsin.';
 }
-window.addEventListener('online',()=>{updateConnectionStatus();if(activeUserId&&cloudSyncPending)scheduleCloudSync(300);});
+window.addEventListener('online',()=>{updateConnectionStatus();if(activeUserId)scheduleCloudSync(300);});
 window.addEventListener('offline',updateConnectionStatus);
 updateConnectionStatus();
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
