@@ -632,6 +632,7 @@ async function activateCloudUser(user){
  const legacy=(migrationOwner&&migrationOwner!==user.id)?null:(oldCurrent||oldLegacy?normalizeUserData(oldCurrent||oldLegacy):null);
  cloudStatus('Hesabının kayıtları güvenli şekilde kontrol ediliyor…');
  const remote=await cloudGetBackup(user.id);
+ if(legacy&&!migrationOwner)localStorage.setItem('borctakip_legacy_migration_owner',user.id);
  if(remote&&Number(remote.schema_version)!==2)throw new Error('Bulut yedeği uygulama sürümüyle uyumlu değil; veriler değiştirilmedi.');
  if(remote)cloudValidatePayload(remote.payload);
  if(local&&remote){
