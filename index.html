@@ -24,7 +24,7 @@ button{border:0;cursor:pointer;font:inherit}.primary{background:var(--blue);colo
 nav{position:fixed;bottom:0;left:0;right:0;background:#ffffffed;backdrop-filter:blur(12px);border-top:1px solid var(--line);display:flex;justify-content:center;z-index:5;padding:8px 2px calc(8px + env(safe-area-inset-bottom))}
 nav button{background:transparent;color:var(--muted);font-size:9px;flex:1;max-width:90px;padding:4px 1px}nav button b{display:block;font-size:16px;margin-bottom:1px}nav button.active{color:var(--blue);font-weight:750}
 .view{display:none}.view.active{display:block}
- #authGate{position:fixed;inset:0;z-index:1000;background:linear-gradient(145deg,#101827,#20385f);display:flex;align-items:center;justify-content:center;padding:22px}
+ #authGate{position:fixed;inset:0;z-index:1000;background:linear-gradient(145deg,#101827,#20385f);display:flex;align-items:center;justify-content:center;padding:22px;visibility:hidden}
  #authGate.hidden{display:none}#authGate .auth-panel{width:100%;max-width:420px;background:#fff;border-radius:22px;padding:24px;box-shadow:0 20px 60px #0005}
  #authGate h1{font-size:23px;margin:0 0 8px;color:#172033}#authGate p{font-size:13px;color:#718096;line-height:1.55}
  #authGate input{width:100%;padding:13px;border:1px solid #e7edf5;border-radius:11px;font:inherit;margin:6px 0 10px}
@@ -366,7 +366,7 @@ const BORCTAKIP_SUPABASE_KEY='sb_publishable_Y0d7RaGCvG-efuQckQWGeQ_G7FdcVrK';
 let cloudClient=null;
 try{if(window.supabase&&typeof window.supabase.createClient==='function'){cloudClient=window.supabase.createClient(BORCTAKIP_SUPABASE_URL,BORCTAKIP_SUPABASE_KEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}});}}catch(error){console.error('Supabase başlatılamadı',error);}
 function cloudStatus(message){const el=document.getElementById('cloudAuthStatus');if(el)el.textContent=message;const gate=document.getElementById('authGateStatus');if(gate)gate.textContent=message;}
-function setAuthGate(visible){const gate=document.getElementById('authGate');if(gate)gate.classList.toggle('hidden',!visible);}
+function setAuthGate(visible){const gate=document.getElementById('authGate');if(gate){gate.classList.toggle('hidden',!visible);gate.style.visibility=visible?'visible':'hidden';}}
 function renderCloudAuth(session){
  const form=document.getElementById('cloudAuthForm');
  const profile=document.getElementById('cloudProfile');
