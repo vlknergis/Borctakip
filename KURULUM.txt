@@ -13,3 +13,4 @@ Notlar:
 - Veriler cihazın tarayıcı depolamasında tutulur. Ayarlar bölümünden düzenli yedek alın.
 - Ödeme hatırlatmaları, uygulama açıldığında kontrol edilir. Tarayıcı kapalıyken zamanında bildirim garantisi vermez.
 - Borç kapatma planı faizsiz yaklaşık simülasyondur.
+Cloudflare yayın kontrolü
