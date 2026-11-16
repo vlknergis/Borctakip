@@ -269,6 +269,19 @@ body.auth-locked #authGate{display:flex}
 
 <section id="settings" class="view">
   <div class="section"><h2>Veriler & Ayarlar</h2></div>
+  <div class="card" id="appInviteCard">
+    <b>📣 Arkadaşlarını Borç Takip VabsPro'ya Davet Et</b>
+    <p class="small">Uygulamanın bağlantısını paylaşarak arkadaşlarının da ücretsiz kullanmaya başlamasını sağlayabilirsin.</p>
+    <div class="field">
+      <label for="appInviteLink">Uygulama bağlantısı</label>
+      <input id="appInviteLink" type="url" readonly value="https://borctakip-8wx.pages.dev" onclick="this.select()" style="font-size:13px">
+    </div>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <button class="primary" type="button" onclick="shareAppInvite()">Uygulamaya Davet Et</button>
+      <button class="ghost" type="button" onclick="copyAppInviteLink()">Bağlantıyı Kopyala</button>
+    </div>
+    <div class="small" id="appInviteStatus" role="status" aria-live="polite" style="margin-top:9px"></div>
+  </div>
   <div class="card">
     <div class="field">
       <label><b>Eski kayıtlardan gelen sabit aylık gelir (₺)</b></label>
@@ -1551,6 +1564,38 @@ initCloudAuth();
 fetchMarketRates();
 setInterval(fetchMarketRates,60000);
 calculateLoan();
+function getAppInviteMessage(){
+ const url=document.getElementById('appInviteLink')?.value||'https://borctakip-8wx.pages.dev';
+ return {url,text:"Borç Takip VabsPro'yu keşfet! Borçlarını, gelir ve giderlerini tek yerden takip edebileceğin ücretsiz uygulamayı buradan kullanabilirsin: "+url};
+}
+async function copyAppInviteLink(){
+ const {url}=getAppInviteMessage();
+ const status=document.getElementById('appInviteStatus');
+ try{
+  if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(url);}
+  else{
+   const field=document.getElementById('appInviteLink');
+   field.focus();field.select();
+   if(!document.execCommand('copy'))throw new Error('Kopyalama desteklenmiyor.');
+  }
+  if(status)status.textContent='Uygulama bağlantısı kopyalandı. İstediğin yerde paylaşabilirsin.';
+ }catch(error){
+  const field=document.getElementById('appInviteLink');
+  if(field){field.focus();field.select();}
+  if(status)status.textContent='Bağlantıyı seçip Kopyala komutunu kullanabilirsin.';
+ }
+}
+async function shareAppInvite(){
+ const invite=getAppInviteMessage();
+ const status=document.getElementById('appInviteStatus');
+ if(navigator.share){
+  try{await navigator.share({title:'Borç Takip VabsPro',text:invite.text,url:invite.url});if(status)status.textContent='Paylaşım ekranı açıldı.';}
+  catch(error){if(error&&error.name!=='AbortError'&&status)status.textContent='Paylaşım açılamadı. Bağlantıyı kopyalayarak gönderebilirsin.';}
+ }else{
+  await copyAppInviteLink();
+  if(status)status.textContent='Bu cihaz doğrudan paylaşımı desteklemiyor. Bağlantı kopyalandı; mesajına yapıştırabilirsin.';
+ }
+}
 function updateConnectionStatus(){
  const online=navigator.onLine;
  const pill=document.getElementById('connectionPill'),label=document.getElementById('connectionLabel'),detail=document.getElementById('connectionDetail');
