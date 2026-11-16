@@ -282,6 +282,15 @@ body.auth-locked #authGate{display:flex}
       <input id="savingsGoalInput" type="number" min="0" step="500" placeholder="Örn. 5000" onchange="saveSavingsGoal()">
     </div>
   </div>
+  <div class="card" id="reminderSettingsCard">
+    <b>🔔 Ödeme Bildirimleri</b>
+    <p class="small">Bildirim iznini aç. Uygulama çalışırken yaklaşan kredi, kredi kartı, borç, kira ve fatura tarihleri kontrol edilir.</p>
+    <label style="display:flex;align-items:center;gap:9px;margin:12px 0"><input id="remindersEnabled" type="checkbox" style="width:auto" onchange="saveReminderSettings()"> Ödeme hatırlatmalarını etkinleştir</label>
+    <div class="small" style="margin:8px 0">Hatırlatma zamanı: 10:00, 14:00 ve 19:00</div>
+    <div class="small" id="notifyStatus" role="status" aria-live="polite">Bildirim durumu kontrol ediliyor…</div>
+    <button class="primary" type="button" style="margin-top:10px" onclick="enableReminders()">Bildirim İznini Aç / Test Et</button>
+    <p class="small" style="margin-top:10px">Önemli: Tarayıcı/PWA uygulaması kapalıyken yerel zamanlayıcı çalışmayabilir. Uygulama kapalıyken güvenilir bildirim için sunucu tabanlı Web Push kurulumu gerekir; bu sürüm bunu garanti etmez.</p>
+  </div>
   <div class="card" id="cloudAccountCard">
     <b>Bulut Hesabı</b>
     <p class="small">Hesabına giriş yaptıktan sonra cihazındaki kayıtları elle buluta yedekleyebilir veya buluttaki yedeği bu cihaza geri yükleyebilirsin. Otomatik eşitleme kapalıdır; hiçbir kayıt iznin olmadan üzerine yazılmaz.</p>
@@ -1514,51 +1523,80 @@ function clearAll(){
   }
 }
 
-function enableReminders(){
- if(!('Notification' in window)){document.getElementById('notifyStatus').textContent='Bu tarayıcı bildirimleri desteklemiyor.';return}
- Notification.requestPermission().then(p=>{
-  document.getElementById('notifyStatus').textContent=p==='granted'?'Bildirim izni verildi. Android’de bildirimler Service Worker üzerinden gösterilir. Kontrol, uygulama açıkken saat 10:00, 14:00 ve 19:00 civarında yapılır; uygulama kapalıyken garanti edilmez.':'Bildirim izni verilmedi.';
-  if(p==='granted')initCloudAuth();
-checkReminders();
- }).catch(()=>{document.getElementById('notifyStatus').textContent='Bildirim izni alınamadı. Tarayıcı ayarlarını kontrol et.'});
+function reminderSettings(){
+ try{return JSON.parse(localStorage.getItem('borctakip_reminder_settings')||'{"enabled":false}')}
+ catch(error){return {enabled:false}}
+}
+function saveReminderSettings(){
+ const enabled=!!document.getElementById('remindersEnabled')?.checked;
+ try{localStorage.setItem('borctakip_reminder_settings',JSON.stringify({enabled}));}catch(error){}
+ const status=document.getElementById('notifyStatus');
+ if(!enabled){if(status)status.textContent='Ödeme hatırlatmaları kapalı.';return;}
+ if(!('Notification' in window)){if(status)status.textContent='Bu tarayıcı bildirimleri desteklemiyor.';return;}
+ if(Notification.permission==='granted'){if(status)status.textContent='Bildirimler açık. Kontroller uygulama çalışırken yapılır.';checkReminders();}
+ else if(status)status.textContent='Bildirim izni vermek için aşağıdaki butona dokun.';
+}
+function refreshReminderSettings(){
+ const settings=reminderSettings(),toggle=document.getElementById('remindersEnabled'),status=document.getElementById('notifyStatus');
+ if(toggle)toggle.checked=!!settings.enabled;
+ if(!status)return;
+ if(!('Notification' in window))status.textContent='Bu tarayıcı bildirimleri desteklemiyor.';
+ else if(Notification.permission==='granted')status.textContent=settings.enabled?'Bildirim izni açık · Hatırlatmalar etkin.':'Bildirim izni açık · Hatırlatmalar kapalı.';
+ else status.textContent=settings.enabled?'Hatırlatmalar etkinleştirildi; Android bildirim izni bekleniyor.':'Bildirimler henüz etkin değil.';
+}
+async function enableReminders(){
+ const status=document.getElementById('notifyStatus');
+ if(!('Notification' in window)){if(status)status.textContent='Bu tarayıcı bildirimleri desteklemiyor.';return;}
+ try{
+  const permission=await Notification.requestPermission();
+  if(permission!=='granted'){if(status)status.textContent='Bildirim izni verilmedi. Android uygulama/tarayıcı ayarlarından izin ver.';return;}
+  const toggle=document.getElementById('remindersEnabled');if(toggle)toggle.checked=true;
+  saveReminderSettings();
+  const shown=await showAppNotification('BorçTakip bildirim testi',{body:'Ödeme hatırlatmaları için bildirimler başarıyla etkinleştirildi.'});
+  if(status)status.textContent=shown?'Bildirim izni açık ve test bildirimi gönderildi.':'İzin açık ancak test bildirimi gösterilemedi.';
+  checkReminders();
+ }catch(error){if(status)status.textContent='Bildirim izni alınamadı: '+(error.message||'Tarayıcı ayarlarını kontrol et.');}
 }
 async function showAppNotification(title,options){
  if('serviceWorker' in navigator){
-  try{
-   const registration=await navigator.serviceWorker.ready;
-   await registration.showNotification(title,options);
-   return true;
-  }catch(error){}
+  try{const registration=await navigator.serviceWorker.ready;await registration.showNotification(title,options);return true;}catch(error){}
  }
- try{
-  new Notification(title,options);
-  return true;
- }catch(error){
-  return false;
- }
+ try{new Notification(title,options);return true;}catch(error){return false;}
 }
 let reminderCheckRunning=false;
 async function checkReminders(){
- if(reminderCheckRunning||!('Notification' in window)||Notification.permission!=='granted')return;
+ const settings=reminderSettings();
+ if(!settings.enabled||reminderCheckRunning||!('Notification' in window)||Notification.permission!=='granted')return;
  const now=new Date(),hour=now.getHours(),minute=now.getMinutes();
  if(![10,14,19].includes(hour)||minute>5)return;
- const key='borctakip_reminder_'+today()+'_'+hour;
- try{if(localStorage.getItem(key))return}catch(error){}
  reminderCheckRunning=true;
  try{
+  const date=today(),dateObj=new Date(date+'T12:00:00');
+  const dueOffset=(due,offset)=>{if(!due)return false;const target=new Date(due+'T12:00:00');return Math.round((target-dateObj)/86400000)===offset;};
+  const notifyOnce=async(kind,id,offset,title,body)=>{
+   const key='borctakip_notice_'+kind+'_'+id+'_'+date+'_d'+offset+'_'+hour;
+   try{if(localStorage.getItem(key))return;}catch(error){}
+   const ok=await showAppNotification(title,{body,tag:'bt-'+kind+'-'+id+'-'+date+'-'+offset, renotify:false});
+   if(ok)try{localStorage.setItem(key,String(Date.now()));}catch(error){}
+  };
   const pending=[];
-  (data.expenses||[]).forEach(e=>{
-   if(monthlyExpenseDate(today().slice(0,7),e.day)===today())pending.push(showAppNotification('BorçTakip sabit gider hatırlatması',{body:e.name+' ('+e.category+') için bugün vade günü. Tutar: '+money(e.amount),tag:'expense-'+e.id+'-'+today()}));
-  });
   (data.debts||[]).forEach(d=>{
-   if(d.due===today()&&remaining(d)>0)pending.push(showAppNotification('BorçTakip borç ödeme hatırlatması',{body:d.name+' borcunun vadesi bugün. Kalan borç: '+money(remaining(d)),tag:'debt-'+d.id+'-'+today()}));
+   if(!(remaining(d)>0)||!d.due)return;
+   const offsets=d.type==='Kredi kartı'?[3,0]:[1,0];
+   offsets.forEach(offset=>{if(dueOffset(d.due,offset))pending.push(notifyOnce('debt',d.id,offset,offset===0?'BorçTakip · Ödeme bugün':'BorçTakip · Yaklaşan ödeme',d.name+' · '+(offset===0?'Bugün son ödeme günü.':'Ödemeye '+offset+' gün kaldı.')+' Kalan: '+money(remaining(d))));});
   });
-  const results=await Promise.all(pending);
-  if(results.every(Boolean))try{localStorage.setItem(key,String(Date.now()))}catch(error){}
- }finally{reminderCheckRunning=false}
+  (data.expenses||[]).forEach(e=>{
+   const due=monthlyExpenseDate(date.slice(0,7),e.day);
+   const dueObj=new Date(due+'T12:00:00');
+   const offset=Math.round((dueObj-dateObj)/86400000);
+   if(offset===1||offset===0)pending.push(notifyOnce('expense',e.id,offset,offset===0?'BorçTakip · Gider bugün':'BorçTakip · Yaklaşan gider',e.name+' · '+(offset===0?'Bugün ödeme günü.':'Yarın ödeme günü.')+' Tutar: '+money(e.amount)));
+  });
+  await Promise.all(pending);
+ }finally{reminderCheckRunning=false;}
 }
 
 document.getElementById('calMonth').value=today().slice(0,7);
+refreshReminderSettings();
 render();
 initCloudAuth();
 fetchMarketRates();
