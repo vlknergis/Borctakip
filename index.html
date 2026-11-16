@@ -39,9 +39,35 @@ canvas{width:100%!important;height:100%!important}
 .ticker-val{font-weight:700;font-size:12px;margin-top:2px;white-space:normal;text-align:center;line-height:1.25}
 .news-card{border-left:4px solid var(--blue);padding-left:12px;margin-bottom:12px}
 @media(min-width:600px){main{padding-top:22px}.modal{align-items:center}.sheet{border-radius:22px}}
+
+/* Zorunlu hesap giriş ekranı */
+body.auth-locked>header,body.auth-locked>.connection-status,body.auth-locked>main,body.auth-locked>nav,body.auth-locked>.modal{display:none!important}
+#authGate{display:none;min-height:100vh;min-height:100dvh;align-items:center;justify-content:center;padding:24px;background:linear-gradient(145deg,#101827,#20385f)}
+body.auth-locked #authGate{display:flex}
+.auth-panel{width:100%;max-width:430px;background:#fff;border-radius:24px;padding:26px 22px;box-shadow:0 20px 60px #0003}
+.auth-brand{font-size:22px;font-weight:850;color:#172033}
+.auth-subtitle{color:#718096;font-size:13px;line-height:1.5;margin:8px 0 22px}
+.auth-field{margin:13px 0}.auth-field label{display:block;font-size:12px;color:#536176;margin-bottom:6px;font-weight:650}
+.auth-field input{width:100%;padding:13px;border:1px solid #dce3ed;border-radius:12px;font:inherit}
+.auth-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}
+.auth-actions button{padding:12px;border-radius:12px;font-weight:750}
+#authGateStatus{min-height:36px;margin-top:14px;font-size:12px;line-height:1.5;color:#536176}
+.auth-forgot{margin-top:10px;width:100%;background:#eef2ff;color:#3568e8;padding:10px;border-radius:10px;font-weight:650}
+
 </style>
 </head>
-<body>
+<body class="auth-locked">
+<div id="authGate" role="main" aria-label="Hesap girişi">
+ <div class="auth-panel">
+  <div class="auth-brand">◈ Borç Takip VabsPro</div>
+  <div class="auth-subtitle">Kişisel finans bilgilerine güvenli şekilde erişmek için hesabına giriş yap veya yeni hesap oluştur.</div>
+  <div class="auth-field"><label for="gateEmail">E-posta adresi</label><input id="gateEmail" type="email" autocomplete="email" placeholder="ornek@mail.com"></div>
+  <div class="auth-field"><label for="gatePassword">Şifre</label><input id="gatePassword" type="password" autocomplete="current-password" minlength="8" placeholder="En az 8 karakter"></div>
+  <div class="auth-actions"><button class="primary" type="button" onclick="gateSignIn()">Giriş Yap</button><button class="ghost" type="button" onclick="gateSignUp()">Hesap Oluştur</button></div>
+  <button class="auth-forgot" type="button" onclick="gateResetPassword()">Şifremi Unuttum</button>
+  <div id="authGateStatus" aria-live="polite">Hesap bağlantısı hazırlanıyor…</div>
+ </div>
+</div>
 <header>
   <div class="top"><div class="brand">◈ Borç Takip VabsPro</div><div class="tag">KİŞİSEL FİNANS</div></div>
   <div class="header-totals">
@@ -375,7 +401,7 @@ async function cloudResetPassword(){
   cloudStatus('Şifre sıfırlama bağlantısı e-posta adresine gönderildi. Gelen kutunu ve spam klasörünü kontrol et. Bağlantı açıldığında Supabase yönlendirme adresi ayarlı olmalıdır.');
  }catch(error){cloudStatus(error.message||'Şifre sıfırlama e-postası gönderilemedi.');}
 }
-async function cloudSignOut(){if(!cloudClient){cloudStatus('Bulut bağlantısı hazır değil.');return;}const {error}=await cloudClient.auth.signOut();cloudStatus(error?'Çıkış yapılamadı: '+error.message:'Hesaptan çıkış yapıldı. Cihazdaki yerel kayıtların korunuyor.');}
+async function cloudSignOut(){if(!cloudClient){cloudStatus('Bulut bağlantısı hazır değil.');return;}const {error}=await cloudClient.auth.signOut();if(error){cloudStatus('Çıkış yapılamadı: '+error.message);return;}setAuthGate(null);cloudStatus('Hesaptan çıkış yapıldı. Cihazdaki yerel kayıtların korunuyor.');}
 let cloudAuthListenerReady=false;
 async function cloudCurrentUser(){
  if(!cloudClient)throw new Error('Bulut istemcisi yüklenemedi. İnternet bağlantısını kontrol et.');
@@ -557,22 +583,30 @@ async function cloudDownload(){
   alert('Bulut yedeği yüklendi. Önceki cihaz verilerinin güvenlik kopyası da saklandı.');
  }catch(error){cloudStatus(error.message||'Bulut yedeği yüklenemedi.');}
 }
+function authGateStatus(message){const el=document.getElementById('authGateStatus');if(el)el.textContent=message;}
+function authGateCredentials(){const email=(document.getElementById('gateEmail')?.value||'').trim();const password=document.getElementById('gatePassword')?.value||'';if(!email)throw new Error('E-posta adresini yaz.');if(!password||password.length<8)throw new Error('Şifre en az 8 karakter olmalı.');return {email,password};}
+function setAuthGate(session){document.body.classList.toggle('auth-locked',!session);if(session){authGateStatus('Giriş başarılı. Hesabın açılıyor…');}else{authGateStatus('Devam etmek için hesabına giriş yap.');}}
+async function gateSignIn(){try{if(!cloudClient)throw new Error('Hesap servisine bağlanılamadı. İnternet bağlantısını kontrol et.');const {email,password}=authGateCredentials();authGateStatus('Giriş yapılıyor…');const {data,error}=await cloudClient.auth.signInWithPassword({email,password});if(error)throw error;if(data.session)setAuthGate(data.session);else authGateStatus('Giriş tamamlanamadı. Tekrar dene.');}catch(error){authGateStatus(error.message||'Giriş yapılamadı.');}}
+async function gateSignUp(){try{if(!cloudClient)throw new Error('Hesap servisine bağlanılamadı. İnternet bağlantısını kontrol et.');const {email,password}=authGateCredentials();authGateStatus('Hesap oluşturuluyor…');const {data,error}=await cloudClient.auth.signUp({email,password});if(error)throw error;if(data.session){setAuthGate(data.session);}else{authGateStatus('Hesap oluşturuldu. E-posta adresine gönderilen doğrulama bağlantısını aç, ardından giriş yap. Spam klasörünü de kontrol et.');}}catch(error){authGateStatus(error.message||'Hesap oluşturulamadı.');}}
+async function gateResetPassword(){try{if(!cloudClient)throw new Error('Hesap servisine bağlanılamadı.');const email=(document.getElementById('gateEmail')?.value||'').trim();if(!email)throw new Error('Şifre sıfırlama bağlantısı için e-posta adresini yaz.');authGateStatus('Şifre sıfırlama e-postası gönderiliyor…');const redirectTo=window.location.origin+window.location.pathname;const {error}=await cloudClient.auth.resetPasswordForEmail(email,{redirectTo});if(error)throw error;authGateStatus('Şifre sıfırlama bağlantısı gönderildi. Gelen kutunu ve spam klasörünü kontrol et.');}catch(error){authGateStatus(error.message||'Şifre sıfırlama e-postası gönderilemedi.');}}
 async function initCloudAuth(){
- if(!cloudClient){cloudStatus('Bulut istemcisi yüklenemedi.');return;}
- const {data,error}=await cloudClient.auth.getSession();
- if(error){cloudStatus('Oturum kontrol edilemedi: '+error.message);return;}
- const session=data.session;
- renderCloudAuth(session);
- cloudStatus(session?'Profilin hazır. Bulut yedekleme kullanıma açık.':'Henüz giriş yapılmadı. Yerel kayıtların bu cihazda kalır.');
- if(session)cloudRefreshBackupInfo();
+ if(!cloudClient){authGateStatus('Hesap servisine bağlanılamadı. İnternet bağlantısını kontrol edip sayfayı yenile.');cloudStatus('Bulut istemcisi yüklenemedi.');return;}
  if(!cloudAuthListenerReady){
   cloudAuthListenerReady=true;
   cloudClient.auth.onAuthStateChange((_event,nextSession)=>{
+   setAuthGate(nextSession);
    renderCloudAuth(nextSession);
-   cloudStatus(nextSession?'Profilin hazır. Bulut yedekleme kullanıma açık.':'Oturum kapatıldı. Yerel kayıtların bu cihazda kalır.');
+   cloudStatus(nextSession?'Profilin hazır. Bulut yedekleme kullanıma açık.':'Oturum kapatıldı. Yeniden giriş yapmalısın.');
    if(nextSession)cloudRefreshBackupInfo();
   });
  }
+ const {data,error}=await cloudClient.auth.getSession();
+ if(error){authGateStatus('Oturum kontrol edilemedi: '+error.message);return;}
+ const session=data.session;
+ setAuthGate(session);
+ renderCloudAuth(session);
+ cloudStatus(session?'Profilin hazır. Bulut yedekleme kullanıma açık.':'Giriş yaparak devam et.');
+ if(session)cloudRefreshBackupInfo();
 }
 </script>
 <script>
