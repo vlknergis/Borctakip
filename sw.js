@@ -1,4 +1,4 @@
-const CACHE='borctakip-v4';
+const CACHE='borctakip-v5';
 const APP_SHELL=['./','./index.html','./manifest.webmanifest','./icon.svg'];
 
 self.addEventListener('install',event=>{
@@ -48,5 +48,29 @@ self.addEventListener('fetch',event=>{
   }catch(error){
    return Response.error();
   }
+ })());
+});
+
+self.addEventListener('push',event=>{
+ let payload={title:'BorçTakip ödeme hatırlatması',body:'Yaklaşan bir ödeme tarihin var.',url:'./'};
+ try{if(event.data){const incoming=event.data.json();payload={...payload,...incoming};}}catch(error){
+  try{if(event.data)payload.body=event.data.text();}catch(ignore){}
+ }
+ event.waitUntil(self.registration.showNotification(payload.title,{
+  body:payload.body,
+  icon:'./icon.svg',
+  badge:'./icon.svg',
+  tag:payload.tag||'borctakip-push',
+  data:{url:payload.url||'./'},
+  renotify:false
+ }));
+});
+self.addEventListener('notificationclick',event=>{
+ event.notification.close();
+ const target=event.notification.data?.url||'./';
+ event.waitUntil((async()=>{
+  const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+  for(const client of windows){if('focus' in client){await client.focus();if('navigate' in client)await client.navigate(target);return;}}
+  if(self.clients.openWindow)await self.clients.openWindow(target);
  })());
 });
